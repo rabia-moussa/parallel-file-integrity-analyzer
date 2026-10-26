@@ -5,7 +5,7 @@ import hashlib as hs
 
 def hashing(file):
     try :
-        hashobj=hs.md5()
+        hashobj=hs.sha256()
         with open(file,'rb') as f:
                 while True :
                     data=f.read(65000)
