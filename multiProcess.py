@@ -60,7 +60,7 @@ class MultiProcess(osmod.Sequential):
         return self.hash_directory 
 
 if __name__ == "__main__" :
-    mlt=MultiProcess("hash_database.json",3,'/home/moussa/Documents/otherFiles')
+    mlt=MultiProcess("the hash database . json ",3,'put your path here')
     mlt.First_run()
     time.sleep(30)
     print("the timestamp end")
