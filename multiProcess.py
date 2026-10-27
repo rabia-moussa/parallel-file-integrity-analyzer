@@ -5,9 +5,9 @@ from hashingFile import hashing
 import time
 
 class MultiProcess(osmod.Sequential):
-    def __init__(self, hash_db, process_num , path):
+    def __init__(self, hash_db, worker_num , path):
         super().__init__(hash_db, path)
-        self.process_num = process_num
+        self.worker_num = worker_num
         self.queue = multiprocessing.Queue(maxsize=3)
         self.results= multiprocessing.Queue(maxsize=3)
 
@@ -15,8 +15,8 @@ class MultiProcess(osmod.Sequential):
         for root, dirs, files in os.walk(self.path):
                 for file in files:
                     self.queue.put(os.path.join(root,file))
-                    print(f"the process {os.getpid()} has put a value {os.path.join(root,file)} in the queue")
-        for _ in range(self.process_num): # indicates the end of the queue for each consumer (process)
+                    # print(f"the process {os.getpid()} has put a value {os.path.join(root,file)} in the queue")
+        for _ in range(self.worker_num): # indicates the end of the queue for each consumer (process)
              self.queue.put(None)        
 
     def consumer(self): # assigned for each worker to get value from the queue
@@ -25,9 +25,10 @@ class MultiProcess(osmod.Sequential):
               path= self.queue.get()
               if path is None:
                     break
+            #   time.sleep(10)
               self.results.put((path,hashing(path)))
               # the function which will be used by the consumer will be called here      
-              print(f"the process {os.getpid()} has taken a value {path} from the queue")
+            #   print(f"the process {os.getpid()} has taken a value {path} from the queue")
         self.results.put(None)
 
     def parcour(self):
@@ -37,14 +38,14 @@ class MultiProcess(osmod.Sequential):
                 target=self.consumer,
                  # consumer requires a func argument
                 name=f"process_{i}",
-            ) for i in range(self.process_num)]   
+            ) for i in range(self.worker_num)]   
          
         producer_process.start()
         for worker in workers :
              worker.start()
 
         flag=0
-        while flag < self.process_num :
+        while flag < self.worker_num :
              item=self.results.get()
              if item==None:
                   flag+=1
@@ -61,9 +62,9 @@ class MultiProcess(osmod.Sequential):
 
 if __name__ == "__main__" :
     mlt=MultiProcess("hash_database.json",3,'/home/moussa/Documents/otherFiles')
-    mlt.First_run()
-    time.sleep(30)
-    print("the timestamp end")
+    # mlt.First_run()
+    # time.sleep(30)
+    # print("the timestamp end")
 
     print('the check run is now starting')
     modified, new, deleted ,duplicates = mlt.check_run()
