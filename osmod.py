@@ -29,7 +29,7 @@ class Sequential:
         # print(hash_counts.elements())
         # print(list(hash_counts.elements()))
         return [
-                path for path , hash in valid_files.items() if hash_counts[hash] > 1]
+                path for path , hash in valid_files.items() if hash_counts[hash] > 1] # I must resturn a tuple contain all duplicated files in the same group 
             # if list(hash_directory.values()).count(hash) > 1 :
             #     if path not in ls_duplicate: ls_duplicate.append(path)
             
