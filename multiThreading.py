@@ -1,4 +1,6 @@
+import signal 
 import threading as thread
+import time 
 import osmod
 import multiProcess
 from queue import Queue
@@ -7,10 +9,16 @@ class MultiTreaded(multiProcess.MultiProcess):
         super().__init__(hash_db,worker_num,path)
         self.queue=Queue(maxsize=worker_num)
         self.results=Queue(maxsize=worker_num)
+        self.flag=thread.Event() # by default is False
+        self.isprocess=False # check weather is an process or not to take the decision about applying the SIG_IGN
+
+
+
 
     def parcour(self):
         self.hash_directory={}
         producer_process=thread.Thread(target=self.producer)
+        producer_process
         workers=[thread.Thread(
                 target=self.consumer,
                  # consumer requires a func argument
@@ -39,10 +47,19 @@ class MultiTreaded(multiProcess.MultiProcess):
 
     
 if __name__ == "__main__" :
-    multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents/otherFiles')
+    multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents')
+
+    time.sleep(10)
+    print('the check run is now starting')
+    def handler(signal , frame):
+             multiT.hundler()
+
+    signal.signal(signal.SIGINT,handler)
+    
     multiT.First_run()
 
-    print('the check run is now starting')
+    
+   
     modified, new, deleted ,duplicates = multiT.check_run()
     print('the modified files are: ', modified)
     print('the new files are: ', new)

@@ -17,7 +17,8 @@ class MultiProcess(osmod.Sequential):
         self.isprocess=True # check weather is an process or not to take the decision about applying the SIG_IGN 
 
     def producer(self): # fill the queue
-        signal.signal(signal.SIGINT,signal.SIG_IGN) # ignore the interreption signal and keep working
+        if self.isprocess:
+            signal.signal(signal.SIGINT,signal.SIG_IGN) # ignore the interreption signal and keep working
         for root, dirs, files in os.walk(self.path):
                 if self.flag.is_set(): # if the flag is True wee stop the producer
                      break
@@ -30,14 +31,16 @@ class MultiProcess(osmod.Sequential):
              self.queue.put(None)      
 
     def consumer(self): # assigned for each worker to get value from the queue
-        signal.signal(signal.SIGINT,signal.SIG_IGN)
-        print(os.getpid , signal.getsignal(signal.SIGINT))
+        if self.isprocess: 
+            signal.signal(signal.SIGINT,signal.SIG_IGN)
+        # print(os.getpid , signal.getsignal(signal.SIGINT))
         while True:
-              signal.signal(signal.SIGINT,signal.SIG_IGN)
+              if self.isprocess:
+               signal.signal(signal.SIGINT,signal.SIG_IGN)
               path= self.queue.get()
               if path is None:
                     break
-              time.sleep(5)
+              time.sleep(2)
               self.results.put((path,hashing(path)))
               # the function which will be used by the consumer will be called here      
             #   print(f"the process {os.getpid()} has taken a value {path} from the queue")
