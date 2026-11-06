@@ -45,7 +45,7 @@ class Sequential:
             print(f"the hash directory is {self.hash_directory}")
             ls_modified=[path for path , hash in self.hash_directory.items()  if path in hash_database and hash != hash_database[path]]
             ls_new=[path for path in self.hash_directory if path not in hash_database]
-            ls_deleted=[path for path in hash_database if path not in self.hash_directory]  
+            ls_deleted=[path for path in hash_database if path not in self.hash_directory and  not os.path.lexists(path)]
         return ls_modified, ls_new, ls_deleted
 
    

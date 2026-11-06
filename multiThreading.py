@@ -49,7 +49,7 @@ class MultiTreaded(multiProcess.MultiProcess):
 if __name__ == "__main__" :
     multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents')
 
-    time.sleep(10)
+    # time.sleep(10)
     print('the check run is now starting')
     def handler(signal , frame):
              multiT.hundler()
@@ -57,8 +57,9 @@ if __name__ == "__main__" :
     signal.signal(signal.SIGINT,handler)
     
     multiT.First_run()
-
     
+    print('the real  check run is now starting')
+    # time.sleep(20)
    
     modified, new, deleted ,duplicates = multiT.check_run()
     print('the modified files are: ', modified)

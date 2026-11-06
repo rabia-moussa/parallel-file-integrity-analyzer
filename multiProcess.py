@@ -40,7 +40,7 @@ class MultiProcess(osmod.Sequential):
               path= self.queue.get()
               if path is None:
                     break
-              time.sleep(2)
+            #   time.sleep(2)
               self.results.put((path,hashing(path)))
               # the function which will be used by the consumer will be called here      
             #   print(f"the process {os.getpid()} has taken a value {path} from the queue")
