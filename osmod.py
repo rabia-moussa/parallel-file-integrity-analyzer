@@ -45,7 +45,7 @@ class Sequential:
             print(f"the hash directory is {self.hash_directory}")
             ls_modified=[path for path , hash in self.hash_directory.items()  if path in hash_database and hash != hash_database[path]]
             ls_new=[path for path in self.hash_directory if path not in hash_database]
-            ls_deleted=[path for path in hash_database if path not in self.hash_directory and  not os.path.lexists(path)]
+            ls_deleted=[path for path in hash_database if path not in self.hash_directory and  not os.path.lexists(path)] # check if the file is deleted in the current run and in the disk
         return ls_modified, ls_new, ls_deleted
 
    
@@ -73,21 +73,45 @@ class Sequential:
         duplicates = self.check_duplicate()
         return modified, new, deleted, duplicates
 
+    def run(self):
+        print('the check run is now starting')
+        modified, new, deleted ,duplicates = self.check_run()
+        print('the modified files are: ', modified)
+        print('the new files are: ', new)
+        print('the deleted files are: ', deleted)
+        print('the duplicate files are: ', duplicates)
+     
+    def verification_tmp(self,timestamp):
+            self.First_run() # create a baseline
+            i=0
+            while True:
+                i+=1
+                self.run() # return the modified, new, deleted and duplicates files
+                with open(self.hash_db,'w') as f:
+                    json.dump(self.hash_directory, f) # print the hash directory in the json file (put the new version as the recent one)
+                print("the timestamp end",i)
+                time.sleep(timestamp)
+    
 if __name__ =="__main__":
-    print('the first run is now starting')
     seq = Sequential('hash_database.json', '/home/moussa/Documents/otherFiles')
-    seq.First_run()
+    seq.verification_tmp(5)    
 
-    time.sleep(30)
-    print("the timestamp end")
 
-    print('the check run is now starting')
-    modified, new, deleted ,duplicates = seq.check_run()
 
-    print('the modified files are: ', modified)
-    print('the new files are: ', new)
-    print('the deleted files are: ', deleted)
-    print('the duplicate files are: ', duplicates)
+    # print('the first run is now starting')
+    # seq = Sequential('hash_database.json', '/home/moussa/Documents/otherFiles')
+    # seq.First_run()
+    
+    # time.sleep(30)
+    # print("the timestamp end")
+
+    # print('the check run is now starting')
+    # modified, new, deleted ,duplicates = seq.check_run()
+
+    # print('the modified files are: ', modified)
+    # print('the new files are: ', new)
+    # print('the deleted files are: ', deleted)
+    # print('the duplicate files are: ', duplicates)
 
 
 
