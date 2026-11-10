@@ -2,9 +2,8 @@ import multiprocessing
 import os
 import osmod
 from hashingFile import hashing
-import time
 import signal
-
+import json
 
 
 class MultiProcess(osmod.Sequential):
@@ -90,10 +89,24 @@ class MultiProcess(osmod.Sequential):
     def hundler(self):
          """made to hundle the gracefull stopage"""
          self.flag.set()
-        
+
+    def verification_tmp(self,timestamp):
+            self.First_run() # create a baseline
+            i=0
+            while True:
+                if self.flag.is_set():
+                    break
+                i+=1
+                self.run() # return the modified, new, deleted and duplicates files
+                with open(self.hash_db,'w') as f:
+                    json.dump(self.hash_directory, f) # print the hash directory in the json file (put the new version as the recent one)
+                print("the timestamp end",i)
+                if self.flag.wait(timestamp):
+                    break
+
     
 if __name__ == "__main__" :
-    mlt=MultiProcess("hash_database.json",3,'/home/moussa/Documents')
+    mlt=MultiProcess("hash_database.json",3,'/home/moussa/Documents/otherFiles')
     
     # time.sleep(30)
     # print("the timestamp end")
@@ -102,14 +115,8 @@ if __name__ == "__main__" :
 
     signal.signal(signal.SIGINT,handler)
     # multiprocessing.set_start_method("fork",force=True)
-    mlt.First_run()
-    print('the check run is now starting')
-    
-    modified, new, deleted ,duplicates = mlt.check_run()
-    print('the modified files are: ', modified)
-    print('the new files are: ', new)
-    print('the deleted files are: ', deleted)
-    print('the duplicate files are: ', duplicates)
+    # mlt.run()
+    mlt.verification_tmp(5)
     
      
       

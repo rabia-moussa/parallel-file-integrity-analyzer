@@ -44,28 +44,30 @@ class MultiTreaded(multiProcess.MultiProcess):
         for worker in workers:
              worker.join()
         return self.hash_directory   
+    
 
     
 if __name__ == "__main__" :
     multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents')
 
-    # time.sleep(10)
-    print('the check run is now starting')
-    def handler(signal , frame):
-             multiT.hundler()
+    # # time.sleep(10)
+    # print('the check run is now starting')
+    # def handler(signal , frame):
+    #          multiT.hundler()
 
-    signal.signal(signal.SIGINT,handler)
+    # signal.signal(signal.SIGINT,handler)
     
-    multiT.First_run()
+    # multiT.First_run()
     
-    print('the real  check run is now starting')
-    # time.sleep(20)
+    # print('the real  check run is now starting')
+    # # time.sleep(20)
    
-    modified, new, deleted ,duplicates = multiT.check_run()
-    print('the modified files are: ', modified)
-    print('the new files are: ', new)
-    print('the deleted files are: ', deleted)
-    print('the duplicate files are: ', duplicates)
+    # modified, new, deleted ,duplicates = multiT.check_run()
+    # print('the modified files are: ', modified)
+    # print('the new files are: ', new)
+    # print('the deleted files are: ', deleted)
+    # print('the duplicate files are: ', duplicates)
+    multiT.verification_tmp(5)
      
  
 
