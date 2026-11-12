@@ -28,8 +28,14 @@ class Sequential:
         hash_counts = Counter(valid_files.values())
         # print(hash_counts.elements())
         # print(list(hash_counts.elements()))
-        return [
-                path for path , hash in valid_files.items() if hash_counts[hash] > 1] # I must resturn a tuple contain all duplicated files in the same group 
+        duplicated_files = [(path,hash) for path , hash in valid_files.items() if hash_counts[hash] > 1] 
+        result ={}
+        for path, hash in duplicated_files:
+            # print(f"the path is {path} and the hash is {hash}")
+            result.setdefault(hash,[]).append(path)
+        return result    # return a dictionary with the hash as key and the list of paths as value
+                
+    # I must resturn a tuple contain all duplicated files in the same group 
             # if list(hash_directory.values()).count(hash) > 1 :
             #     if path not in ls_duplicate: ls_duplicate.append(path)
             
@@ -41,17 +47,17 @@ class Sequential:
         ls_deleted=[]
         with open(self.hash_db ,'r') as f:
             hash_database=json.load(f)
-            print(f"the hash database is {hash_database}")
-            print(f"the hash directory is {self.hash_directory}")
+            # print(f"the hash database is {hash_database}")
+            # print(f"the hash directory is {self.hash_directory}")
             ls_modified=[path for path , hash in self.hash_directory.items()  if path in hash_database and hash != hash_database[path]]
             ls_new=[path for path in self.hash_directory if path not in hash_database]
             ls_deleted=[path for path in hash_database if path not in self.hash_directory and  not os.path.lexists(path)] # check if the file is deleted in the current run and in the disk
-        return ls_modified, ls_new, ls_deleted
+        return ls_modified, ls_new, ls_deleted # those are lists of paths
 
    
 
     def parcour(self):
-        print("now using the walk command")
+        # print("now using the walk command")
         self.hash_directory={}
         for root, dirs, files in os.walk(self.path):   
             for name in files:
