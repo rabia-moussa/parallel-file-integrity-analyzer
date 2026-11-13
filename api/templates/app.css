@@ -1,0 +1,435 @@
+/* =========================================================================
+   File Integrity Checker — presentation layer only.
+   No id or class used by api.js is renamed or removed here.
+   ========================================================================= */
+
+:root {
+    color-scheme: light;
+
+    --bg: #f3eee3;
+    --surface: #fffdf9;
+    --surface-2: #f8f3ea;
+    --ink: #2b2118;
+    --ink-muted: #6f6255;
+    --line: #e6ddcf;
+
+    --accent: #c24615;
+    --accent-hover: #a5390f;
+    --ring: rgba(194, 70, 21, 0.22);
+    --ring-solid: #d9541e;
+
+    --denied: #a97a0c;
+    --modified: #2f6fb0;
+    --new: #2e7d4f;
+    --deleted: #b3261e;
+    --dup: #6b4fa0;
+
+    --radius: 10px;
+    --radius-sm: 7px;
+    --shadow: 0 1px 2px rgba(43, 33, 24, 0.05), 0 4px 14px rgba(43, 33, 24, 0.06);
+
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+    max-width: 1180px;
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* -------------------------------------------------------------------------
+   Page header
+   ------------------------------------------------------------------------- */
+
+.page-header {
+    margin-bottom: 1.5rem;
+}
+
+h1 {
+    margin: 0 0 0.6rem;
+    font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.15rem);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+h1::after {
+    content: "";
+    display: block;
+    width: 3rem;
+    height: 3px;
+    margin-top: 0.6rem;
+    border-radius: 3px;
+    background-color: var(--accent);
+}
+
+.subtitle {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--ink-muted);
+    font-size: 0.93rem;
+}
+
+.notice {
+    margin: 0.75rem 0 0;
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+}
+
+/* -------------------------------------------------------------------------
+   Scan form (keeps #form, #directory and the submit button untouched)
+   ------------------------------------------------------------------------- */
+
+#form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.5rem 0.75rem;
+    padding: 1rem 1.1rem;
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+#form label {
+    flex: 1 0 100%;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink-muted);
+}
+
+#directory {
+    flex: 1 1 16rem;
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--ink);
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#directory::placeholder {
+    color: #a89b8c;
+}
+
+#directory:hover {
+    border-color: #cfc3b1;
+}
+
+#directory:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+}
+
+#directory:user-invalid {
+    border-color: var(--deleted);
+    box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.18);
+}
+
+button {
+    padding: 0.62rem 1.25rem;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: var(--accent);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.05s ease;
+}
+
+button:hover {
+    background-color: var(--accent-hover);
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+button:focus-visible {
+    outline: 3px solid var(--ring-solid);
+    outline-offset: 2px;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* -------------------------------------------------------------------------
+   Results grid (fixes the old "display: flexbox" typo)
+   ------------------------------------------------------------------------- */
+
+.results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.permission-denied,
+.modified_files,
+.new_files,
+.deleted_files,
+.duplicates {
+    --card-accent: var(--line);
+
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 0.95rem 1.05rem 1.1rem;
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--card-accent);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.permission-denied {
+    --card-accent: var(--denied);
+}
+
+.modified_files {
+    --card-accent: var(--modified);
+}
+
+.new_files {
+    --card-accent: var(--new);
+}
+
+.deleted_files {
+    --card-accent: var(--deleted);
+}
+
+.duplicates {
+    --card-accent: var(--dup);
+}
+
+/* Static title (the h2 without an id) */
+.results > div > h2:not([id]) {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+/* Dynamic count line (the h2 with an id), rendered as a badge */
+.results h2[id] {
+    display: inline-block;
+    align-self: flex-start;
+    max-width: 100%;
+    margin: 0.4rem 0 0.55rem;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--card-accent);
+    background-color: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow-wrap: anywhere;
+}
+
+/* -------------------------------------------------------------------------
+   File lists — every results list id ends with "-list", so the attribute
+   selector styles all of them without touching class names.
+   ------------------------------------------------------------------------- */
+
+.results ul[id$="-list"] {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: 20rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+}
+
+.results ul[id$="-list"]:not(:empty) {
+    border-top: 1px solid var(--line);
+}
+
+.results ul[id$="-list"]::-webkit-scrollbar {
+    width: 8px;
+}
+
+.results ul[id$="-list"]::-webkit-scrollbar-thumb {
+    background-color: var(--line);
+    border-radius: 4px;
+}
+
+.results ul[id$="-list"] > li {
+    padding: 0.45rem 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--ink-muted);
+    overflow-wrap: anywhere;
+    border-bottom: 1px solid var(--line);
+    transition: background-color 0.12s ease;
+}
+
+.results ul[id$="-list"] > li:last-child {
+    border-bottom: none;
+}
+
+.results ul[id$="-list"] > li:nth-child(even) {
+    background-color: var(--surface-2);
+}
+
+.results ul[id$="-list"] > li:hover {
+    color: var(--ink);
+    background-color: var(--surface-2);
+    box-shadow: inset 3px 0 0 var(--card-accent);
+}
+
+/* "Scanned, nothing found" — only shown once a path has been entered. */
+body:has(#form:valid) .results ul[id$="-list"]:empty::after {
+    content: "None";
+    display: block;
+    padding: 0.55rem 0.5rem;
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    font-style: italic;
+    color: var(--ink-muted);
+}
+
+/* -------------------------------------------------------------------------
+   Duplicate groups (api.js appends a <ul> group per hash)
+   ------------------------------------------------------------------------- */
+
+#duplicate-files-list > ul {
+    margin: 0.4rem 0;
+    padding: 0.55rem 0.65rem;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--ink);
+    background-color: var(--surface-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--card-accent);
+    border-radius: var(--radius-sm);
+    overflow-wrap: anywhere;
+}
+
+#duplicate-files-list > ul > li {
+    position: relative;
+    padding: 0.15rem 0 0.15rem 1.1rem;
+    color: var(--ink-muted);
+    overflow-wrap: anywhere;
+}
+
+#duplicate-files-list > ul > li::before {
+    content: "\2514";
+    position: absolute;
+    left: 0.1rem;
+    color: var(--card-accent);
+}
+
+/* -------------------------------------------------------------------------
+   Motion & print
+   ------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+@media print {
+    body {
+        max-width: none;
+        padding: 0;
+        background-color: #ffffff;
+        color: #000000;
+    }
+
+    h1::after,
+    #form,
+    .subtitle,
+    .notice {
+        display: none;
+    }
+
+    .results {
+        grid-template-columns: 1fr;
+    }
+
+    .results > div {
+        box-shadow: none;
+        break-inside: avoid;
+    }
+
+    .results ul[id$="-list"] {
+        max-height: none;
+        overflow: visible;
+    }
+}
+
+/* ======================= DARK MODE — delete this block to disable ======================= */
+/* The light theme lives entirely in the :root tokens above. Removing this block
+   reverts the page to the light theme with no leftovers. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+
+        --bg: #14110f;
+        --surface: #1d1916;
+        --surface-2: #26211d;
+        --ink: #f1ebe2;
+        --ink-muted: #b3a698;
+        --line: #37302a;
+
+        --accent: #e2693a;
+        --accent-hover: #f08256;
+        --ring: rgba(226, 105, 58, 0.28);
+        --ring-solid: #f08256;
+
+        --denied: #d9a53c;
+        --modified: #6ea6dd;
+        --new: #5fbb8b;
+        --deleted: #e06a63;
+        --dup: #a98cd8;
+
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
+    }
+
+    /* Dark text on the lighter dark-mode accent keeps the button readable. */
+    button {
+        color: #191411;
+    }
+
+    #directory::placeholder {
+        color: #7e7266;
+    }
+
+    #directory:hover {
+        border-color: #4a4038;
+    }
+}
+/* ==================== END DARK MODE ==================== */

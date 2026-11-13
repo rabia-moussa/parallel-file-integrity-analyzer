@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Scan a directory and report modified, new, deleted, duplicate and permission-denied files.">
+    <title>File Integrity Checker</title>
+    <link rel="stylesheet" href="app.css">
+    <script src="api.js" defer></script>
+</head>
+<body>
+    <header class="page-header">
+        <h1>File Integrity Checker</h1>
+        <p class="subtitle">
+            Enter a directory to compare it against the saved snapshot. A scan can take
+            several minutes on large folders &mdash; results appear when it finishes.
+        </p>
+    </header>
+
+    <form method="post" id="form">
+        <label for="directory">Enter Directory Path:</label>
+        <input type="text" id="directory" name="directory" required
+               placeholder="/home/user/Documents" spellcheck="false" autocomplete="off">
+        <button type="submit">Run Check</button>
+    </form>
+
+    <noscript>
+        <p class="notice">This page needs JavaScript enabled to run a check.</p>
+    </noscript>
+
+    <main class="page-main">
+        <div class="results">
+            <div class="permission-denied">
+                <h2>Permission Denied Files</h2>
+                <h2 id="permission-denied-title"></h2>
+                <ul id="permission-denied-list">
+                    <!-- Permission denied files will be populated here -->
+                </ul>
+            </div>
+
+            <div class="modified_files">
+                <h2>Modified Files</h2>
+                <h2 id="modified-files-title"></h2>
+                <ul id="modified-files-list">
+                    <!-- Modified files will be populated here -->
+                </ul>
+            </div>
+
+            <div class="new_files">
+                <h2>New Files</h2>
+                <h2 id="new-files-title"></h2>
+                <ul id="new-files-list">
+                    <!-- New files will be populated here -->
+                </ul>
+            </div>
+
+            <div class="deleted_files">
+                <h2>Deleted Files</h2>
+                <h2 id="deleted-files-title"></h2>
+                <ul id="deleted-files-list">
+                    <!-- Deleted files will be populated here -->
+                </ul>
+            </div>
+
+            <div class="duplicates">
+                <h2>Duplicate Files</h2>
+                <h2 id="duplicate-files-title"></h2>
+                <ul id="duplicate-files-list">
+                    <!-- Duplicate file groups will be populated here -->
+                </ul>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
