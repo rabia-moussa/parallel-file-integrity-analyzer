@@ -23,6 +23,8 @@ class Sequential:
                     continue
             except OSError as err:
                 print(f"OS error occurred while checking duplicates for {path} : {err} ")
+                continue
+            if hash.startswith("Error:"):
                 continue    
             valid_files[path]=hash
         hash_counts = Counter(valid_files.values())
@@ -47,12 +49,13 @@ class Sequential:
         ls_deleted=[]
         with open(self.hash_db ,'r') as f:
             hash_database=json.load(f)
-            # print(f"the hash database is {hash_database}")
-            # print(f"the hash directory is {self.hash_directory}")
+            print(f"the hash database is {hash_database}")
+            print(f"the hash directory is {self.hash_directory}")
             ls_modified=[path for path , hash in self.hash_directory.items()  if path in hash_database and hash != hash_database[path]]
             ls_new=[path for path in self.hash_directory if path not in hash_database]
             ls_deleted=[path for path in hash_database if path not in self.hash_directory and  not os.path.lexists(path)] # check if the file is deleted in the current run and in the disk
-        return ls_modified, ls_new, ls_deleted # those are lists of paths
+            ls_permission_denied=[path for path , hash in self.hash_directory.items()  if hash.startswith("Error:PermissionError")]
+        return ls_modified, ls_new, ls_deleted, ls_permission_denied # those are lists of paths
 
    
 
@@ -75,17 +78,18 @@ class Sequential:
 
     def check_run(self):
         self.hash_directory=self.parcour()
-        modified, new, deleted = self.check_modified()
+        modified, new, deleted, permission_denied = self.check_modified()
         duplicates = self.check_duplicate()
-        return modified, new, deleted, duplicates
+        return modified, new, deleted, duplicates, permission_denied
 
     def run(self):
         print('the check run is now starting')
-        modified, new, deleted ,duplicates = self.check_run()
+        modified, new, deleted ,duplicates, permission_denied = self.check_run()
         print('the modified files are: ', modified)
         print('the new files are: ', new)
         print('the deleted files are: ', deleted)
         print('the duplicate files are: ', duplicates)
+        print('the permission denied files are: ', permission_denied)
      
     def verification_tmp(self,timestamp):
             self.First_run() # create a baseline
