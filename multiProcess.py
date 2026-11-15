@@ -92,12 +92,16 @@ class MultiProcess(osmod.Sequential):
          """made to hundle the gracefull stopage"""
          self.flag.set()
          
-    def verification_tmp(self,timestamp):
-        if self.isprocess :
-            helper_p=multiprocessing.Process(target=self.helper,args=(timestamp,))
-            helper_p.start()
-            helper_p.join()
-        self.helper(timestamp)    
+    def verification_tmp(self, timestamp):
+        if not self.isprocess:
+            return self.helper(timestamp)          # threads: run it here, it's safe
+        helper_p = multiprocessing.Process(target=self.helper, args=(timestamp,))
+        helper_p.start()
+        helper_p.join()
+        if helper_p.exitcode != 0:
+            print("helper process failed, exitcode:", helper_p.exitcode)
+
+           
             
     def helper(self,timestamp):
             if self.isprocess:
@@ -111,10 +115,12 @@ class MultiProcess(osmod.Sequential):
                     break
                 i+=1
                 self.run() # return the modified, new, deleted and duplicates files
+                if self.flag.is_set():
+                        break
                 with open(self.hash_db,'w') as f:
                     json.dump(self.hash_directory, f) # print the hash directory in the json file (put the new version as the recent one)
                 print("the timestamp end",i)
-                if self.flag.wait(timestamp):
+                if self.flag.wait(timestamp): # waits for the signal to be set by the main process 
                     break
 
                 

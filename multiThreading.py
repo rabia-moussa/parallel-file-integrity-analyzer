@@ -12,9 +12,6 @@ class MultiTreaded(multiProcess.MultiProcess):
         self.flag=thread.Event() # by default is False
         self.isprocess=False # check weather is an process or not to take the decision about applying the SIG_IGN
 
-
-
-
     def parcour(self):
         self.hash_directory={}
         producer_process=thread.Thread(target=self.producer)
@@ -49,7 +46,7 @@ class MultiTreaded(multiProcess.MultiProcess):
     
 if __name__ == "__main__" :
     multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents')
-
+    multiT.verification_tmp(5)
     # # time.sleep(10)
     # print('the check run is now starting')
     # def handler(signal , frame):
