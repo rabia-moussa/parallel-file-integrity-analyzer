@@ -2,7 +2,7 @@ from collections import Counter
 import os 
 from hashingFile import hashing
 import hashlib as hs
-
+import signal
 import json
 
 import time
@@ -12,11 +12,15 @@ class Sequential:
         self.hash_db = hash_db
         self.path = path
         self.hash_directory = {}
+       
+
+    
 
     
     def check_duplicate(self):
         valid_files={}
         for path , hash in self.hash_directory.items():
+           
             if hash == None : continue
             try :
                 if  os.path.getsize(path) == 0 :
@@ -62,7 +66,8 @@ class Sequential:
     def parcour(self):
         # print("now using the walk command")
         self.hash_directory={}
-        for root, dirs, files in os.walk(self.path):   
+        for root, dirs, files in os.walk(self.path): 
+
             for name in files:
                 # print(name , "the permissions are: ", oct(os.stat(os.path.join(root, name)).st_mode)[-3:])
                 # print(f"the path is {os.path.join(root,name)} and the hash is {hashing(os.path.join(root,name))} \n")
@@ -71,20 +76,37 @@ class Sequential:
           
 
 
-    def First_run(self):
-        with open(self.hash_db,'w') as f:
-            json.dump(self.parcour(), f)
+    def First_run(self , force=False):
+        """creates a checks basline """
+        if not force and os.path.lexists(self.hash_db): # the  user doesn t want to create a new basline (force value is False)  
+            try: # verifie the existance of the baseline
+                with open(self.hash_db) as f:
+                    json.load(f)
+                return                       # baseline exists and is readable and wee keep the last basline from the previous session
+            except (json.JSONDecodeError, OSError):
+                print("baseline unreadable -> rebuilding it") 
+                # wee force to build a new basline because the last one isn t existing 
+            with open(self.hash_db,'w') as f: # the case if the user wants a new basline 
+                json.dump(self.parcour(), f)
 
 
     def check_run(self):
-        self.hash_directory=self.parcour()
-        modified, new, deleted, permission_denied = self.check_modified()
-        duplicates = self.check_duplicate()
-        return modified, new, deleted, duplicates, permission_denied
+        try :
+            self.hash_directory=self.parcour()
+            modified, new, deleted, permission_denied = self.check_modified()
+            duplicates = self.check_duplicate()
+            return modified, new, deleted, duplicates, permission_denied
+        except KeyboardInterrupt :
+            print("\n stopped by the user")
+            return None
 
     def run(self):
         print('the check run is now starting')
-        modified, new, deleted ,duplicates, permission_denied = self.check_run()
+        result = self.check_run()
+        if result is None :
+            print('the check in interrupted')
+            return None
+        modified, new, deleted ,duplicates, permission_denied = result
         print('the modified files are: ', modified)
         print('the new files are: ', new)
         print('the deleted files are: ', deleted)
@@ -92,6 +114,7 @@ class Sequential:
         print('the permission denied files are: ', permission_denied)
      
     def verification_tmp(self,timestamp):
+        try :    
             self.First_run() # create a baseline
             i=0
             while True:
@@ -101,10 +124,13 @@ class Sequential:
                     json.dump(self.hash_directory, f) # print the hash directory in the json file (put the new version as the recent one)
                 print("the timestamp end",i)
                 time.sleep(timestamp)
+        except KeyboardInterrupt:
+            print('\n stopped by the user')        
+            
     
 if __name__ =="__main__":
     seq = Sequential('hash_database.json', '/home/moussa/Documents/otherFiles')
-    seq.verification_tmp(5)    
+    seq.check_run()   
 
 
 
