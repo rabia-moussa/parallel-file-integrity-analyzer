@@ -1,5 +1,7 @@
 import multiprocessing
+import threading as thread
 import os
+import time
 import osmod
 from hashingFile import hashing
 import signal
@@ -14,6 +16,7 @@ class MultiProcess(osmod.Sequential):
         self.results= multiprocessing.Queue(maxsize=3)
         self.flag=multiprocessing.Event() # by default is False
         self.isprocess=True # check weather is an process or not to take the decision about applying the SIG_IGN 
+        self.install_signal_handler()
 
     def producer(self): # fill the queue
         if self.isprocess:
@@ -69,7 +72,6 @@ class MultiProcess(osmod.Sequential):
                 flag+=1
             else : 
                 path , info = item
-                print(f"the process {os.getpid()} had this result {path} and the hash {info}")
                 self.hash_directory[path]=info
 
             
@@ -89,8 +91,19 @@ class MultiProcess(osmod.Sequential):
     def hundler(self):
          """made to hundle the gracefull stopage"""
          self.flag.set()
-
+         
     def verification_tmp(self,timestamp):
+        if self.isprocess :
+            helper_p=multiprocessing.Process(target=self.helper,args=(timestamp,))
+            helper_p.start()
+            helper_p.join()
+        self.helper(timestamp)    
+            
+    def helper(self,timestamp):
+            if self.isprocess:
+                signal.signal(signal.SIGINT,signal.SIG_IGN)
+            if self.flag.is_set():
+                return
             self.First_run() # create a baseline
             i=0
             while True:
@@ -104,25 +117,24 @@ class MultiProcess(osmod.Sequential):
                 if self.flag.wait(timestamp):
                     break
 
+                
+
+    def install_signal_handler(self):
+        signal.signal(signal.SIGINT, self.handler_sigint)
+
+    def handler_sigint(self, signal , frame):
+         self.hundler()     
+
     
 if __name__ == "__main__" :
     mlt=MultiProcess("hash_database.json",3,'/home/moussa/Documents/otherFiles')
-    
-    # time.sleep(30)
-    # print("the timestamp end")
-    def handler(signal , frame):
-         mlt.hundler()
+    mlt.verification_tmp(10)
+    # # time.sleep(30)
+    # # print("the timestamp end")
+    # def handler(signal , frame):
+    #      mlt.hundler()
 
-    signal.signal(signal.SIGINT,handler)
-    # multiprocessing.set_start_method("fork",force=True)
-    # mlt.run()
-    mlt.verification_tmp(5)
+    # signal.signal(signal.SIGINT,handler)
+    # # multiprocessing.set_start_method("fork",force=True)
+    # # mlt.run()
     
-     
-      
-
-           
-              
-              
-         
-   
