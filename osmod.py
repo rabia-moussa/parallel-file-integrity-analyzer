@@ -53,8 +53,8 @@ class Sequential:
         ls_deleted=[]
         with open(self.hash_db ,'r') as f:
             hash_database=json.load(f)
-            print(f"the hash database is {hash_database}")
-            print(f"the hash directory is {self.hash_directory}")
+            # print(f"the hash database is {hash_database}")
+            # print(f"the hash directory is {self.hash_directory}")
             ls_modified=[path for path , hash in self.hash_directory.items()  if path in hash_database and hash != hash_database[path]]
             ls_new=[path for path in self.hash_directory if path not in hash_database]
             ls_deleted=[path for path in hash_database if path not in self.hash_directory and  not os.path.lexists(path)] # check if the file is deleted in the current run and in the disk
@@ -92,7 +92,10 @@ class Sequential:
 
     def check_run(self):
         try :
+            start_timer=time.perf_counter()
             self.hash_directory=self.parcour()
+            end_timer=time.perf_counter()
+            print('the require time for one run is',end_timer-start_timer)
             modified, new, deleted, permission_denied = self.check_modified()
             duplicates = self.check_duplicate()
             return modified, new, deleted, duplicates, permission_denied
@@ -101,17 +104,19 @@ class Sequential:
             return None
 
     def run(self):
-        print('the check run is now starting')
+        # print('the check run is now starting')
+        
         result = self.check_run()
+        
         if result is None :
             print('the check in interrupted')
             return None
         modified, new, deleted ,duplicates, permission_denied = result
-        print('the modified files are: ', modified)
-        print('the new files are: ', new)
-        print('the deleted files are: ', deleted)
-        print('the duplicate files are: ', duplicates)
-        print('the permission denied files are: ', permission_denied)
+        # print('the modified files are: ', modified)
+        # print('the new files are: ', new)
+        # print('the deleted files are: ', deleted)
+        # print('the duplicate files are: ', duplicates)
+        # print('the permission denied files are: ', permission_denied)
      
     def verification_tmp(self,timestamp):
         try :    
@@ -129,8 +134,8 @@ class Sequential:
             
     
 if __name__ =="__main__":
-    seq = Sequential('hash_database.json', '/home/moussa/Documents/otherFiles')
-    seq.check_run()   
+    seq = Sequential('hash_database.json', '/home/moussa/')
+    seq.run()   
 
 
 
