@@ -19,31 +19,51 @@ class MultiProcess(osmod.Sequential):
         self.install_signal_handler()
 
     def producer(self): # fill the queue
+        batch_size=64
+        batch=[]
         if self.isprocess:
             signal.signal(signal.SIGINT,signal.SIG_IGN) # ignore the interreption signal and keep working
+            
         for root, dirs, files in os.walk(self.path):
                 if self.flag.is_set(): # if the flag is True wee stop the producer
                      break
                 for file in files:
                     if self.flag.is_set():
                         break
-                    self.queue.put(os.path.join(root,file))
+                    batch.append(os.path.join(root,file)) # append to a list a much way faster then put 
+                    if len(batch) >= batch_size :    
+                       self.queue.put(batch) # wee put all the list into the queue instead of doing this per file
+                       batch=[]
+        if batch : # add the rest
+            self.queue.put(batch)
+             
                     # print(f"the process {os.getpid()} has put a value {os.path.join(root,file)} in the queue")
         for _ in range(self.worker_num): # indicates the end of the queue for each consumer (process)
              self.queue.put(None)      
 
     def consumer(self): # assigned for each worker to get value from the queue
+        batch=[]
         if self.isprocess: 
             signal.signal(signal.SIGINT,signal.SIG_IGN)
         # print(os.getpid , signal.getsignal(signal.SIGINT))
         while True:
               if self.isprocess:
                signal.signal(signal.SIGINT,signal.SIG_IGN)
-              path= self.queue.get()
-              if path is None:
+              batch= self.queue.get()
+              if batch is None:
                     break
             #   time.sleep(2)
-              self.results.put((path,hashing(path)))
+              results=[]
+              for path in batch:
+                if self.flag.is_set():      # stop at the next file boundary
+                 break
+                results.append((path,hashing(path)))
+            #   else :
+            #       print(f"pid is [{os.getpid()}] batch complete {len(results)}/{len(batch)}", flush=True)
+              if results:
+               self.results.put(results)
+
+
               # the function which will be used by the consumer will be called here      
             #   print(f"the process {os.getpid()} has taken a value {path} from the queue")
         self.results.put(None)
@@ -68,11 +88,11 @@ class MultiProcess(osmod.Sequential):
         flag=0
         while flag < self.worker_num :
             item=self.results.get()
-            if item==None:
+            if item is None:
                 flag+=1
             else : 
-                path , info = item
-                self.hash_directory[path]=info
+                for path , info in item :
+                 self.hash_directory[path]=info
 
             
      
@@ -94,7 +114,7 @@ class MultiProcess(osmod.Sequential):
          
     def verification_tmp(self, timestamp):
         if not self.isprocess:
-            return self.helper(timestamp)          # threads: run it here, it's safe
+            return self.helper(timestamp)        
         helper_p = multiprocessing.Process(target=self.helper, args=(timestamp,))
         helper_p.start()
         helper_p.join()
@@ -133,7 +153,7 @@ class MultiProcess(osmod.Sequential):
 
     
 if __name__ == "__main__" :
-    mlt=MultiProcess("hash_database.json",3,'/home/moussa/Documents/otherFiles')
+    mlt=MultiProcess("hash_database.json",3,'/home/moussa/')
     mlt.verification_tmp(10)
     # # time.sleep(30)
     # # print("the timestamp end")

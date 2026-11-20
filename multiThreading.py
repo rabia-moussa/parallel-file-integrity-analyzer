@@ -32,7 +32,7 @@ class MultiTreaded(multiProcess.MultiProcess):
              if item is None:
                   flag+=1
              else : 
-                  path , info = item
+                for path , info in item :
                   self.hash_directory[path]=info
                   
 
@@ -45,8 +45,9 @@ class MultiTreaded(multiProcess.MultiProcess):
 
     
 if __name__ == "__main__" :
-    multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents')
-    multiT.verification_tmp(5)
+    multiT=MultiTreaded("hash_database.json",3,'/home/moussa/')
+    # multiT.verification_tmp(5)
+    multiT.run()
     # # time.sleep(10)
     # print('the check run is now starting')
     # def handler(signal , frame):
@@ -64,7 +65,7 @@ if __name__ == "__main__" :
     # print('the new files are: ', new)
     # print('the deleted files are: ', deleted)
     # print('the duplicate files are: ', duplicates)
-    multiT.verification_tmp(5)
+    
      
  
 
