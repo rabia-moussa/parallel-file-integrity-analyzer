@@ -75,7 +75,17 @@ def baseline():
         return {"error": f"Unknown scan mode: {mode}"}, 400
     print(f"Received directory path: {directory}")
     print(f"the mode is {mode}")
-    scanner.First_run()
+    scanner.First_run(True)
+
+    return {
+        "status": "ok",
+        "directory": directory,
+        "mode": mode,
+    }, 200
+
+@app.route('/stop')
+def clean_stoppage(): # stop the instance used now by changing the flag by set()
+    pass
 
 
 if __name__=="__main__":
