@@ -76,22 +76,23 @@ class Sequential:
           
 
 
-    def First_run(self , force=False):
+    def First_run(self, force=False):
         """creates a checks basline """
-        if not force and os.path.lexists(self.hash_db): # the  user doesn t want to create a new basline (force value is False)  
-            try: # verifie the existance of the baseline
+        if not force and os.path.lexists(self.hash_db):
+            try:
                 with open(self.hash_db) as f:
                     json.load(f)
-                return                       # baseline exists and is readable and wee keep the last basline from the previous session
+                return
             except (json.JSONDecodeError, OSError):
-                print("baseline unreadable -> rebuilding it") 
-                # wee force to build a new basline because the last one isn t existing 
-            with open(self.hash_db,'w') as f: # the case if the user wants a new basline 
-                json.dump(self.parcour(), f)
+                print("baseline unreadable -> rebuilding it")
+
+        with open(self.hash_db, 'w') as f:
+            json.dump(self.parcour(), f)
 
 
-    def check_run(self):
+    def check_run(self, baseline: bool = False):
         try :
+            # self.First_run(baseline)
             start_timer=time.perf_counter()
             self.hash_directory=self.parcour()
             end_timer=time.perf_counter()
@@ -106,17 +107,17 @@ class Sequential:
     def run(self):
         # print('the check run is now starting')
         
-        result = self.check_run()
+        result = self.check_run(False)
         
         if result is None :
             print('the check in interrupted')
             return None
         modified, new, deleted ,duplicates, permission_denied = result
-        # print('the modified files are: ', modified)
-        # print('the new files are: ', new)
-        # print('the deleted files are: ', deleted)
-        # print('the duplicate files are: ', duplicates)
-        # print('the permission denied files are: ', permission_denied)
+        print('the modified files are: ', modified)
+        print('the new files are: ', new)
+        print('the deleted files are: ', deleted)
+        print('the duplicate files are: ', duplicates)
+        print('the permission denied files are: ', permission_denied)
      
     def verification_tmp(self,timestamp):
         try :    
@@ -134,7 +135,7 @@ class Sequential:
             
     
 if __name__ =="__main__":
-    seq = Sequential('hash_database.json', '/home/moussa/')
+    seq = Sequential('hash_database.json', '/home/moussa/Documents/otherFiles')
     seq.run()   
 
 
