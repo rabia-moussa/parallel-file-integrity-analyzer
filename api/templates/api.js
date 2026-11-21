@@ -11,7 +11,112 @@ async function runCheck(path) {
     }
 
 }
-   
+
+
+// Renders one flat result section (an array of file paths).
+// titleId / listId are the ids of the <h2> and <ul> already present in home.html.
+function renderFileList(titleId, listId, label, items) {
+    const title = document.getElementById(titleId);
+    const list = document.getElementById(listId);
+    items = Array.isArray(items) ? items : [];
+
+    title.textContent = `${label} (${items.length})`;
+    list.innerHTML = "";
+
+    if (items.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "None";
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const file of items) {
+        const li = document.createElement("li");
+        li.textContent = file;
+        list.appendChild(li);
+    }
+}
+
+
+// Renders the duplicates section, which is a { hash: [paths] } dictionary
+// and therefore needs a nested group -> files structure.
+function renderDuplicates(titleId, listId, label, duplicates) {
+    const title = document.getElementById(titleId);
+    const list = document.getElementById(listId);
+    const groups = duplicates && typeof duplicates === "object"
+        ? Object.entries(duplicates)
+        : [];
+
+    title.textContent = `${label} (${groups.length} groups)`;
+    list.innerHTML = "";
+
+    if (groups.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "None";
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const [hash, files] of groups) {
+        const group = document.createElement("li");
+
+        const header = document.createElement("strong");
+        header.textContent = `Hash: ${hash}`;
+        group.appendChild(header);
+
+        const fileList = document.createElement("ul");
+        (Array.isArray(files) ? files : []).forEach((file, index) => {
+            const item = document.createElement("li");
+            item.textContent = `File ${index + 1}: ${file}`;
+            fileList.appendChild(item);
+        });
+
+        group.appendChild(fileList);
+        list.appendChild(group);
+    }
+}
+
+
+// Principal renderer. Takes the source of information as an argument and
+// awaits it inside, so the same function is used for a normal scan and a
+// periodic scan (pass the promise / value produced by either one).
+async function renderResults(source) {
+    const result = await source;
+
+    renderFileList(
+        "permission-denied-title",
+        "permission-denied-list",
+        "Permission Denied Files",
+        result?.permission_denied
+    );
+    renderFileList(
+        "modified-files-title",
+        "modified-files-list",
+        "Modified Files",
+        result?.modified
+    );
+    renderFileList(
+        "new-files-title",
+        "new-files-list",
+        "New Files",
+        result?.new
+    );
+    renderFileList(
+        "deleted-files-title",
+        "deleted-files-list",
+        "Deleted Files",
+        result?.deleted
+    );
+    renderDuplicates(
+        "duplicate-files-title",
+        "duplicate-files-list",
+        "Duplicate Files",
+        result?.duplicates
+    );
+}
+
 
 const form = document.querySelector('form');
 
@@ -19,73 +124,5 @@ form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const directoryInput = document.getElementById('directory');
     const directoryPath = directoryInput.value
-    result = await runCheck(directoryPath)
-    // Display the permission denied files and their count in the HTML
-    document.getElementById('permission-denied-title').textContent = 'Permission Denied Files are around '
-    + result.counts.permission_denied;
-    const permissionDeniedList = document.getElementById('permission-denied-list');
-    permissionDeniedList.innerHTML = ''; 
-    result.permission_denied.forEach(file => {
-        const item = document.createElement('li');
-        item.textContent = file;
-        permissionDeniedList.appendChild(item); })
-
-    // Display the modified files and their count in the HTML
-    document.getElementById('modified-files-title').textContent = 'Permission Denied Files are around '
-    + result.counts.modified;
-    const modified = document.getElementById('modified-files-list');
-    modified.innerHTML = ''; 
-    result.modified.forEach(file => {
-        const item = document.createElement('li');
-        item.textContent = file;
-        modified.appendChild(item); })       
-    
-        // Display the  new files and their count in the HTML
-    document.getElementById('new-files-title').textContent = 'new Files are around '
-    + result.counts.new;
-    const new_files = document.getElementById('new-files-list');
-    new_files.innerHTML = ''; 
-    result.new.forEach(file => {
-        const item = document.createElement('li');
-        item.textContent = file;
-        new_files.appendChild(item); })
-    
-      // Display the  deleted files and their count in the HTML
-    document.getElementById('deleted-files-title').textContent = 'deleted Files are around '
-    + result.counts.deleted;
-    const deleted = document.getElementById('deleted-files-list');
-    deleted.innerHTML = ''; 
-    result.deleted.forEach(file => {
-        const item = document.createElement('li');
-        item.textContent = file;
-        deleted.appendChild(item); })
-
-
-
-    // display the duplicate files and their count in the HTML 
-    document.getElementById('duplicate-files-title').textContent =
-      'Duplicate Files are around ' + result.counts.duplicate_groups ;
-
-      const duplicateFilesList = document.getElementById('duplicate-files-list');
-      duplicateFilesList.innerHTML = '';
-
-      for (const [hash, files] of Object.entries(result.duplicates)) {
-        const item=document.createElement('ul');
-        item.textContent = `group : Hash: ${hash}`;
-        let count = 0 ;
-        files.forEach(file =>{
-            count ++;
-            const fileItem=document.createElement('li');
-            fileItem.textContent=`file ${count} :${file}`;
-            item.appendChild(fileItem);
-      })
-        duplicateFilesList.appendChild(item);
-
-      }
-      })  
-   
-    
-    
-    
-    
-
+    await renderResults(runCheck(directoryPath))
+})
