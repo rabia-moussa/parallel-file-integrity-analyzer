@@ -146,8 +146,7 @@ class MultiProcess(osmod.Sequential):
                 
 
     def install_signal_handler(self):
-        if thread.current_thread() is thread.main_thread():
-            signal.signal(signal.SIGINT, self.handler_sigint)
+        signal.signal(signal.SIGINT, self.handler_sigint)
 
     def handler_sigint(self, signal , frame):
          self.hundler()     
