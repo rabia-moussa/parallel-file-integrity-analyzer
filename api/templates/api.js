@@ -1,8 +1,8 @@
-async function runCheck(path) {
+async function runCheck(path, mode = 'sequential') {
     try {
         const response = await fetch('http://127.0.0.1:5000/scan' 
             
-            , {method:'POST' , headers: { "Content-Type": "application/json" },body : JSON.stringify({directory: path}) } );
+            , {method:'POST' , headers: { "Content-Type": "application/json" },body : JSON.stringify({directory: path , scanMode : mode}) } );
         return response.json();
 
         }
@@ -10,6 +10,20 @@ async function runCheck(path) {
         console.error('Error running check:', error);
     }
 
+}
+
+async function Firstrun(path , mode='sequentiel') {
+    try {
+        const response = await fetch('http://127.0.0.1:5000/First_run'
+        , {method: 'POST' ,header : { "Content-Type": "application/json" } 
+        , body : JSON.stringify({directory:path , scanMode : mode})
+     }
+        )
+    }
+    catch (error) {
+        console.error('Error running check:', error);
+    }
+    
 }
 
 
@@ -124,5 +138,6 @@ form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const directoryInput = document.getElementById('directory');
     const directoryPath = directoryInput.value
-    await renderResults(runCheck(directoryPath))
+    const mode = document.getElementById('mode').value;
+    await renderResults(runCheck(directoryPath, mode))
 })

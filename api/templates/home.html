@@ -21,6 +21,16 @@
         <label for="directory">Enter Directory Path:</label>
         <input type="text" id="directory" name="directory" required
                placeholder="/home/user/Documents" spellcheck="false" autocomplete="off">
+
+        <div class="mode-control">
+            <label for="mode">Execution mode</label>
+            <select id="mode" name="mode">
+                <option value="sequential" selected>Sequential</option>
+                <option value="multiprocess">MultiProcess</option>
+                <option value="multithreaded">MultiTreaded</option>
+            </select>
+        </div>
+
         <button type="submit">Run Check</button>
     </form>
 
