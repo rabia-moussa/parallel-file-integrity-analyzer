@@ -12,18 +12,20 @@ async function runCheck(path, mode = 'sequential') {
 
 }
 
-async function Firstrun(path , mode='sequentiel') {
-    try {
-        const response = await fetch('http://127.0.0.1:5000/First_run'
-        , {method: 'POST' ,header : { "Content-Type": "application/json" } 
-        , body : JSON.stringify({directory:path , scanMode : mode})
-     }
-        )
+async function Firstrun(path, mode = 'sequential') {
+    const response = await fetch('http://127.0.0.1:5000/baseline', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directory: path, scanMode: mode })
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
     }
-    catch (error) {
-        console.error('Error running check:', error);
-    }
-    
+
+    return data;
 }
 
 
@@ -133,11 +135,45 @@ async function renderResults(source) {
 
 
 const form = document.querySelector('form');
+const firstRunButton = document.getElementById('first-run');
+const statusMessage = document.getElementById('status-message');
+
+function setStatus(message, type = '') {
+    if (!statusMessage) return;
+    statusMessage.textContent = message;
+    statusMessage.className = type;
+}
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const directoryInput = document.getElementById('directory');
     const directoryPath = directoryInput.value
     const mode = document.getElementById('mode').value;
+    setStatus('');
     await renderResults(runCheck(directoryPath, mode))
 })
+
+firstRunButton.addEventListener('click', async () => {
+    const directoryPath = document.getElementById('directory').value.trim();
+    const mode = document.getElementById('mode').value;
+
+    if (!directoryPath) {
+        setStatus('Please enter a directory path first.', 'error');
+        return;
+    }
+
+    firstRunButton.disabled = true;
+    setStatus('Creating the baseline...');
+
+    try {
+        const result = await Firstrun(directoryPath, mode);
+        setStatus(
+            `Baseline created for ${result.directory || directoryPath} (${result.mode || mode}).`,
+            'success'
+        );
+    } catch (error) {
+        setStatus(error.message, 'error');
+    } finally {
+        firstRunButton.disabled = false;
+    }
+});

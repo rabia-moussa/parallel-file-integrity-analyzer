@@ -142,6 +142,65 @@ h1::after {
     box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.18);
 }
 
+.mode-control {
+    display: flex;
+    flex: 0 1 11rem;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.mode-control label {
+    flex: none;
+}
+
+#mode {
+    padding: 0.6rem 0.75rem;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--ink);
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#mode:hover {
+    border-color: #cfc3b1;
+}
+
+#mode:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+}
+
+#first-run {
+    color: var(--accent);
+    background-color: var(--surface);
+    border-color: var(--accent);
+}
+
+#first-run:hover {
+    color: #ffffff;
+    background-color: var(--accent);
+}
+
+#status-message {
+    flex: 1 0 100%;
+    margin: 0;
+    min-height: 1.25em;
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+}
+
+#status-message.success {
+    color: var(--new);
+}
+
+#status-message.error {
+    color: var(--deleted);
+}
+
 button {
     padding: 0.62rem 1.25rem;
     font: inherit;
