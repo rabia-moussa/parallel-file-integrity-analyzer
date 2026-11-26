@@ -4,12 +4,14 @@ import time
 import osmod
 import multiProcess
 from queue import Queue
+from stop_control import StopController
+
 class MultiTreaded(multiProcess.MultiProcess):
     def __init__(self,hash_db,worker_num,path):
         super().__init__(hash_db,worker_num,path)
         self.queue=Queue(maxsize=worker_num)
         self.results=Queue(maxsize=worker_num)
-        self.flag=thread.Event() # by default is False
+        self.stop = StopController('thread') # by default is False
         self.isprocess=False # check weather is an process or not to take the decision about applying the SIG_IGN
 
     def parcour(self):
@@ -45,9 +47,9 @@ class MultiTreaded(multiProcess.MultiProcess):
 
     
 if __name__ == "__main__" :
-    multiT=MultiTreaded("hash_database.json",3,'/home/moussa/')
-    # multiT.verification_tmp(5)
+    multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents')
     multiT.run()
+    
     # # time.sleep(10)
     # print('the check run is now starting')
     # def handler(signal , frame):

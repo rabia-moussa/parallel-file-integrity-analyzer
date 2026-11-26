@@ -5,6 +5,7 @@ import time
 import osmod
 from hashingFile import hashing
 import signal
+import queue
 import json
 from stop_control import StopController
 
@@ -22,7 +23,7 @@ class MultiProcess(osmod.Sequential):
         # self.install_signal_handler()
 
     def producer(self): # fill the queue
-        batch_size=64
+        batch_size=10   
         batch=[]
         if self.isprocess:
             signal.signal(signal.SIGINT,signal.SIG_IGN) # ignore the interreption signal and keep working
@@ -38,9 +39,9 @@ class MultiProcess(osmod.Sequential):
                         if len(batch) >= batch_size :
                          try :
                             self.queue.put(batch,timeout=20) # wee put all the list into the queue instead of doing this per file 
-                         except self.queue.full(): # wait for 20 second if the put operation is failed then check if the queue is full (the workers probably dies) then break
+                         except queue.Full: # wait for 20 second if the put operation is failed then check if the queue is full (the workers probably dies) then break
                             break
-                        batch=[]
+                         batch=[]
         finally :               
             if batch : # add the rest
                 self.queue.put(batch)
@@ -59,12 +60,9 @@ class MultiProcess(osmod.Sequential):
                 if self.isprocess:
                  signal.signal(signal.SIGINT,signal.SIG_IGN)
                 try :
-                    batch= self.queue.get(timeout=10)
-                except self.queue.full(): # wait for 20 second if the get operation is failed then check if the queue is full (the workers probably dies) then break
+                 batch= self.queue.get(timeout=20)
+                except queue.Full: # wait for 20 second if the get operation is failed then check if the queue is full (the workers probably dies) then break
                     break  
-                finally :
-                    if results:
-                        self.results.put(results) # en cas de fin de timeout on met les fichier parcouru dans 
                 if batch is None:
                         break
                 #   time.sleep(2)
