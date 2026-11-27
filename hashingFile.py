@@ -3,11 +3,13 @@ import hashlib as hs
 
 
 
-def hashing(file):
+def hashing(file,stop=None):
     try :
         hashobj=hs.sha256()
         with open(file,'rb') as f:
                 while True :
+                    if stop is not None :
+                         return 'error:aborted'
                     data=f.read(65000)
                     if not data : break
                     hashobj.update(data)

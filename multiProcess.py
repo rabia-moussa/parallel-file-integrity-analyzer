@@ -87,7 +87,7 @@ class MultiProcess(osmod.Sequential):
                      left = batch[i:]
                      break
                     
-                    done.append((path,hashing(path)))
+                    done.append((path,hashing(path,self.stop.stop_requested)))
                 if done:
                     self.results.put(("done",done))
                 if left:
