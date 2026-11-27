@@ -11,19 +11,20 @@ from stop_control import StopController
 
 
 class MultiProcess(osmod.Sequential):
-    def __init__(self, hash_db, worker_num , path):
+    def __init__(self, hash_db, worker_num , path , stop=None):
         super().__init__(hash_db, path)
+        self.unprocessed=[]
         self.worker_num = worker_num
         self.queue = multiprocessing.Queue(maxsize=self.worker_num)
         self.results= multiprocessing.Queue(maxsize=self.worker_num)
-        self.stop=StopController('process') # the new hundler
+        self.stop=stop or StopController('process') # the new hundler
         # self.flag=multiprocessing.Event() # by default is False
 
         self.isprocess=True # check weather is an process or not to take the decision about applying the SIG_IGN 
         # self.install_signal_handler()
 
     def producer(self): # fill the queue
-        batch_size=10   
+        batch_size=64 
         batch=[]
         if self.isprocess:
             signal.signal(signal.SIGINT,signal.SIG_IGN) # ignore the interreption signal and keep working
@@ -61,20 +62,26 @@ class MultiProcess(osmod.Sequential):
                  signal.signal(signal.SIGINT,signal.SIG_IGN)
                 try :
                  batch= self.queue.get(timeout=20)
-                except queue.Full: # wait for 20 second if the get operation is failed then check if the queue is full (the workers probably dies) then break
-                    break  
+                except queue.Empty: # wait for 20 second if the get operation is failed then check if the queue is still Empty (the workers probably dies) then continue
+                    continue  
                 if batch is None:
                         break
                 #   time.sleep(2)
-                results=[]
-                for path in batch:
-                    if self.stop.stop_requested():      # stop at the next file boundary
+                done,left=[] , []
+                for i,path in enumerate(batch):
+                    if self.stop.stop_requested():     # stop at the next file boundary
+                     left = batch[i:]
                      break
-                    results.append((path,hashing(path)))
+                    
+                    done.append((path,hashing(path)))
+                if done:
+                    self.results.put(("done",done))
+                if left:
+                    self.results.put(("left",left))    
+
                 #   else :
                 #       print(f"pid is [{os.getpid()}] batch complete {len(results)}/{len(batch)}", flush=True)
-                if results:
-                 self.results.put(results)
+                
 
 
               # the function which will be used by the consumer will be called here      
@@ -93,7 +100,6 @@ class MultiProcess(osmod.Sequential):
             target=self.consumer,
             name=f"process_{i}",
             ) for i in range(self.worker_num)]
-        
         for worker in workers :
             worker.start()
         return workers
@@ -104,21 +110,31 @@ class MultiProcess(osmod.Sequential):
             item=self.results.get()
             if item is None:
                 flag+=1
-            else : 
-                for path , info in item :
-                 self.hash_directory[path]=info
+                continue
+            kind,payload=item
+            if kind== "done":
+                for path , info in payload :
+                   self.hash_directory[path]=info
+            else :
+                self.unprocessed.extend(payload)  
 
             
      
     def parcour(self):
         self.hash_directory={}
+        self.unprocessed=[]
         producer_process=self.start_producer()
         workers=self.start_workers()      
         self.collect_results()
                   # the last thing I did "the problem wee want to fill the data into the correspondig strucutre which the func is called"
         producer_process.join()
+        if producer_process.exitcode != 0:
+            print("helper process failed, exitcode:", producer_process.exitcode)
         for worker in workers:
              worker.join()
+             if worker.exitcode != 0:
+              print("helper process failed, exitcode:", worker.exitcode)
+             
         # print(producer_process.exitcode()) # if it prints 0 the producer is ends otherwise there is a problem      
         return self.hash_directory 
 
@@ -150,6 +166,7 @@ class MultiProcess(osmod.Sequential):
                         break
                 with open(self.hash_db,'w') as f:
                     json.dump(self.hash_directory, f) # print the hash directory in the json file (put the new version as the recent one)
+                if self.unprocessed : print("unprocessed files: ",self.unprocessed)
                 print("the timestamp end",i)
                 if self.stop.wait_abort_requested(timestamp): # waits for the signal to be set by the main process 
                     break

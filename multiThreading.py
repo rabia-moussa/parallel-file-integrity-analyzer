@@ -8,10 +8,9 @@ from stop_control import StopController
 
 class MultiTreaded(multiProcess.MultiProcess):
     def __init__(self,hash_db,worker_num,path):
-        super().__init__(hash_db,worker_num,path)
+        super().__init__(hash_db,worker_num,path,StopController('thread'))
         self.queue=Queue(maxsize=worker_num)
         self.results=Queue(maxsize=worker_num)
-        self.stop = StopController('thread') # by default is False
         self.isprocess=False # check weather is an process or not to take the decision about applying the SIG_IGN
 
     def parcour(self):
@@ -28,14 +27,15 @@ class MultiTreaded(multiProcess.MultiProcess):
         for worker in workers :
              worker.start()
 
-        flag=0
-        while flag < self.worker_num :
-             item=self.results.get()
-             if item is None:
-                  flag+=1
-             else : 
-                for path , info in item :
-                  self.hash_directory[path]=info
+        # flag=0
+        # while flag < self.worker_num :
+        #      item=self.results.get()
+        #      if item is None:
+        #           flag+=1
+        #      else : 
+        #         for path , info in item :
+        #           self.hash_directory[path]=info
+        self.collect_results()          
                   
 
                   # the last thing I did "the problem wee want to fill the data into the correspondig strucutre which the func is called"
@@ -48,7 +48,7 @@ class MultiTreaded(multiProcess.MultiProcess):
     
 if __name__ == "__main__" :
     multiT=MultiTreaded("hash_database.json",3,'/home/moussa/Documents')
-    multiT.run()
+    multiT.verification_tmp(5)
     
     # # time.sleep(10)
     # print('the check run is now starting')
