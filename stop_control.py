@@ -1,8 +1,6 @@
 import signal
 import threading as thread 
 import multiprocessing
-import threading
-import time
 
 class StopController:
     """gracefull stoppage
@@ -12,8 +10,8 @@ class StopController:
     """
     def __init__(self , ctx=None):
      self.mode = ctx
-     self.event = multiprocessing.Event() if ctx == 'process' else threading.Event()
-     self.abort = multiprocessing.Event() if ctx == 'process' else threading.Event()
+     self.event = multiprocessing.Event() if ctx == 'process' else thread.Event()
+     self.abort = multiprocessing.Event() if ctx == 'process' else thread.Event()
      self.clicks=0
      self.install_signal_handler()
 
@@ -23,7 +21,7 @@ class StopController:
        self.clicks+=1
        if self.clicks==1:
         self.abort.set()
-       if self.clicks==2:
+       else:
         self.event.set() 
 
     
@@ -38,7 +36,7 @@ class StopController:
        return self.abort.is_set()
 
     def wait_requested(self,timestamp):
-       self.event.wait(timestamp)
+       return self.event.wait(timestamp)
     
     def wait_abort_requested(self,timestamp):
-       self.abort.wait(timestamp)   
+       return self.abort.wait(timestamp)   

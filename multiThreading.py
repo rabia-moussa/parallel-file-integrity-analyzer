@@ -15,6 +15,9 @@ class MultiTreaded(multiProcess.MultiProcess):
 
     def parcour(self):
         self.hash_directory={}
+        self.unprocessed=[]
+        self.interrupted=False      # P0-06 : remis a zero pour chaque nouveau scan
+        self.producer_done.clear()  # P0-07 : remis a zero pour chaque nouveau scan
         producer_process=thread.Thread(target=self.producer)
         producer_process
         workers=[thread.Thread(
@@ -35,7 +38,7 @@ class MultiTreaded(multiProcess.MultiProcess):
         #      else : 
         #         for path , info in item :
         #           self.hash_directory[path]=info
-        self.collect_results()          
+        self.collect_results(workers, producer_process) # P0-06/P0-07 : on passe les workers et le producteur
                   
 
                   # the last thing I did "the problem wee want to fill the data into the correspondig strucutre which the func is called"
