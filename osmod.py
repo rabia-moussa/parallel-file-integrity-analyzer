@@ -10,7 +10,7 @@ import time
 class Sequential:
     def __init__(self, hash_db, path):
         self.hash_db = hash_db
-        self.path = path
+        self.path = os.path.realpath(os.path.abspath(path))
         self.hash_directory = {}
        
 
@@ -53,12 +53,15 @@ class Sequential:
         ls_deleted=[]
         with open(self.hash_db ,'r') as f:
             hash_database=json.load(f)
+        enteries=hash_database.get(self.path) 
+        if enteries is None :
+            raise KeyError(f"no baseline for this root : {self.path}")   
             # print(f"the hash database is {hash_database}")
             # print(f"the hash directory is {self.hash_directory}")
-            ls_modified=[path for path , hash in self.hash_directory.items()  if path in hash_database and hash != hash_database[path]]
-            ls_new=[path for path in self.hash_directory if path not in hash_database]
-            ls_deleted=[path for path in hash_database if path not in self.hash_directory and  not os.path.lexists(path)] # check if the file is deleted in the current run and in the disk
-            ls_permission_denied=[path for path , hash in self.hash_directory.items()  if hash.startswith("Error:PermissionError")]
+        ls_modified=[path for path , hash in self.hash_directory.items()  if path in enteries and hash != enteries[path]]
+        ls_new=[path for path in self.hash_directory if path not in enteries]
+        ls_deleted=[path for path in enteries if path not in self.hash_directory and  not os.path.lexists(path)] # check if the file is deleted in the current run and in the disk
+        ls_permission_denied=[path for path , hash in self.hash_directory.items()  if hash.startswith("Error:PermissionError")]
         return ls_modified, ls_new, ls_deleted, ls_permission_denied # those are lists of paths
 
    
@@ -76,18 +79,22 @@ class Sequential:
           
 
 
-    def First_run(self, force=False):
+    def First_run(self):
         """creates a checks basline """
-        if not force and os.path.lexists(self.hash_db):
+        data={}
+        if os.path.lexists(self.hash_db):
             try:
                 with open(self.hash_db) as f:
-                    json.load(f)
-                return
-            except (json.JSONDecodeError, OSError):
+                    data=json.load(f)
+                if not isinstance(data,dict):
+                    raise ValueError("isn t a json format")
+            except (json.JSONDecodeError, OSError,ValueError):
                 print("baseline unreadable -> rebuilding it")
-
+                data={}
+        #merge the hash directory into data
+        data[self.path]=self.parcour()
         with open(self.hash_db, 'w') as f:
-            json.dump(self.parcour(), f)
+            json.dump(data, f,indent=2)
 
 
     def check_run(self, baseline: bool = False):
@@ -135,7 +142,8 @@ class Sequential:
             
     
 if __name__ =="__main__":
-    seq = Sequential('hash_database.json', '/home/moussa/Documents/otherFiles')
+    seq = Sequential('hash_database.json', '/home/moussa/Documents')
+    seq.First_run()
     seq.run()   
 
 

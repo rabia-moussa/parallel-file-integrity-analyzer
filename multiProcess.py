@@ -197,6 +197,7 @@ class MultiProcess(osmod.Sequential):
                 return
             self.First_run() # create a baseline
             i=0
+            data={}
             while True:
                 if  self.stop.abort_requested():
                     break
@@ -204,8 +205,9 @@ class MultiProcess(osmod.Sequential):
                 self.run() # return the modified, new, deleted and duplicates files
                 if self.stop.abort_requested():
                         break
+                data[self.path]=self.parcour()
                 with open(self.hash_db,'w') as f:
-                    json.dump(self.hash_directory, f) # print the hash directory in the json file (put the new version as the recent one)
+                    json.dump(data, f,indent=2) # print the hash directory in the json file (put the new version as the recent one)
                 if self.unprocessed : print("unprocessed files: ",self.unprocessed)
                 print("the timestamp end",i)
                 if self.stop.wait_abort_requested(timestamp): # waits for the signal to be set by the main process 
@@ -217,7 +219,7 @@ class MultiProcess(osmod.Sequential):
     
 if __name__ == "__main__" :
     mlt=MultiProcess("hash_database.json",3,'/home/moussa/Documents/otherFiles')
-    mlt.verification_tmp(10)
+    mlt.verification_tmp(5)
     # # time.sleep(30)
     # # print("the timestamp end")
     # def handler(signal , frame):
