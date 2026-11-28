@@ -15,19 +15,19 @@ async function requestJSON(path, options) {
     return data;
 }
 
-async function runCheck(path, mode = 'sequential') {
+async function runCheck(path, mode = 'sequential', workers = 3) {
     return requestJSON('/scan', {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directory: path, scanMode: mode }),
+        body: JSON.stringify({ directory: path, scanMode: mode, workers: workers }),
     });
 }
 
-async function Firstrun(path, mode = 'sequential') {
+async function Firstrun(path, mode = 'sequential', workers = 3) {
     return requestJSON('/baseline', {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directory: path, scanMode: mode }),
+        body: JSON.stringify({ directory: path, scanMode: mode, workers: workers }),
     });
 }
 
@@ -146,6 +146,20 @@ async function renderResults(source) {
 }
 
 
+function readWorkers() {
+    const input = document.getElementById('workers');
+    if (!input) return 3;
+    const value = Number(input.value);
+    return Number.isFinite(value) && value >= 1 ? Math.floor(value) : 3;
+}
+
+function updateWorkersVisibility() {
+    const control = document.getElementById('workers-control');
+    const select = document.getElementById('mode');
+    if (!control || !select) return;
+    control.hidden = select.value === 'sequential';
+}
+
 const form = document.querySelector('form');
 const firstRunButton = document.getElementById('first-run');
 const submitButton = form.querySelector('button[type="submit"]');
@@ -177,6 +191,7 @@ form.addEventListener('submit', async (event) => {
 
     const directoryPath = document.getElementById('directory').value.trim();
     const mode = document.getElementById('mode').value;
+    const workers = readWorkers();
 
     if (!directoryPath) {
         setStatus('Please enter a directory path first.', 'error');
@@ -188,7 +203,7 @@ form.addEventListener('submit', async (event) => {
 
     try {
         clearResultError();
-        const result = await runCheck(directoryPath, mode);
+        const result = await runCheck(directoryPath, mode, workers);
         await renderResults(result);
 
         if (result.complete === false) {
@@ -213,6 +228,7 @@ form.addEventListener('submit', async (event) => {
 firstRunButton.addEventListener('click', async () => {
     const directoryPath = document.getElementById('directory').value.trim();
     const mode = document.getElementById('mode').value;
+    const workers = readWorkers();
 
     if (!directoryPath) {
         setStatus('Please enter a directory path first.', 'error');
@@ -224,7 +240,7 @@ firstRunButton.addEventListener('click', async () => {
 
     try {
         clearResultError();
-        const result = await Firstrun(directoryPath, mode);
+        const result = await Firstrun(directoryPath, mode, workers);
         setStatus(
             `Baseline created for ${result.directory || directoryPath} (${result.mode || mode}, ${result.entries} entries).`,
             'success'
@@ -248,6 +264,9 @@ if (stopButton) {
         }
     });
 }
+
+updateWorkersVisibility();
+document.getElementById('mode').addEventListener('change', updateWorkersVisibility);
 
 // Etat initial : les cinq sections affichent "None" des le chargement.
 const uiState = document.getElementById('ui-state');

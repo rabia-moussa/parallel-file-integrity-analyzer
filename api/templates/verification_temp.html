@@ -165,6 +165,16 @@ h1::after {
     gap: 0.35rem;
 }
 
+.mode-control[hidden] {
+    display: none !important;
+}
+
+.field-hint {
+    margin: 0;
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+}
+
 .mode-control label {
     flex: none;
 }
@@ -436,7 +446,7 @@ body:has(#form:valid) .results ul[id$="-list"]:empty::after {
 }
 
 #duplicate-files-list > li > ul > li::before {
-    content: "\2514";
+    content: "©4";
     position: absolute;
     left: 0.1rem;
     color: var(--card-accent);
@@ -672,7 +682,7 @@ body {
     font-size: 0.85em;
 }
 
-    </style>
+</style>
 </head>
 <body>
     <button id="sidebar-toggle" class="hamburger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
@@ -708,6 +718,13 @@ body {
             </select>
         </div>
 
+        <div class="mode-control" id="workers-control" hidden>
+            <label for="workers">Number of workers</label>
+            <input type="number" id="workers" name="workers"
+                   min="1" max="64" step="1" value="3">
+            <p class="field-hint">Processes or threads, only for MultiProcess / MultiTreaded.</p>
+        </div>
+
         <div class="mode-control">
             <label for="timestamp">Timestamp (seconds)</label>
             <input type="number" id="timestamp" name="timestamp"
@@ -728,6 +745,7 @@ body {
                 <dt>Run id</dt><dd id="watch-run">—</dd>
                 <dt>Directory</dt><dd id="watch-directory">—</dd>
                 <dt>Mode</dt><dd id="watch-mode">—</dd>
+                <dt>Workers</dt><dd id="watch-workers">—</dd>
                 <dt>Timestamp</dt><dd id="watch-timestamp">—</dd>
                 <dt>Started</dt><dd id="watch-started">—</dd>
                 <dt>Last end</dt><dd id="watch-ended">—</dd>
@@ -863,6 +881,20 @@ function renderResults(source) {
     renderDuplicates("duplicate-files-title", "duplicate-files-list", result.duplicates);
 }
 
+function readWorkers() {
+    const input = document.getElementById('workers');
+    if (!input) return 3;
+    const value = Number(input.value);
+    return Number.isFinite(value) && value >= 1 ? Math.floor(value) : 3;
+}
+
+function updateWorkersVisibility() {
+    const control = document.getElementById('workers-control');
+    const select = document.getElementById('mode');
+    if (!control || !select) return;
+    control.hidden = select.value === 'sequential';
+}
+
 const form = document.getElementById('watch-form');
 const startButton = document.getElementById('start-watch');
 const stopButton = document.getElementById('stop-watch');
@@ -874,6 +906,7 @@ const fields = {
     run: document.getElementById('watch-run'),
     directory: document.getElementById('watch-directory'),
     mode: document.getElementById('watch-mode'),
+    workers: document.getElementById('watch-workers'),
     timestamp: document.getElementById('watch-timestamp'),
     started: document.getElementById('watch-started'),
     ended: document.getElementById('watch-ended'),
@@ -897,6 +930,7 @@ function showState(data) {
     fields.run.textContent = data.run_id || data.last_run_id || '—';
     fields.directory.textContent = data.directory || '—';
     fields.mode.textContent = data.mode || '—';
+    fields.workers.textContent = data.workers == null ? '—' : String(data.workers);
     fields.timestamp.textContent = data.timestamp == null ? '—' : (data.timestamp + ' s');
     fields.started.textContent = data.started_at || '—';
     fields.ended.textContent = data.ended_at || '—';
@@ -925,6 +959,7 @@ form.addEventListener('submit', async (event) => {
     const directory = document.getElementById('directory').value.trim();
     const mode = document.getElementById('mode').value;
     const seconds = Number(timestampInput.value);
+    const workers = readWorkers();
     if (!directory) {
         setStatus('Please enter a directory path first.', 'error');
         return;
@@ -940,7 +975,7 @@ form.addEventListener('submit', async (event) => {
         const result = await requestJSON('/verification_temp/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ directory: directory, scanMode: mode, timestamp: seconds }),
+            body: JSON.stringify({ directory: directory, scanMode: mode, timestamp: seconds, workers: workers }),
         });
         setStatus('Watcher started (run ' + result.run_id + ', every ' + result.timestamp + ' s).', 'success');
         await pollStatus();
@@ -969,6 +1004,8 @@ stopButton.addEventListener('click', async () => {
 
 const uiState = document.getElementById('ui-state');
 if (uiState) uiState.textContent = 'JavaScript actif — résultats prêts';
+updateWorkersVisibility();
+document.getElementById('mode').addEventListener('change', updateWorkersVisibility);
 pollStatus();
 
 

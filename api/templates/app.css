@@ -157,6 +157,16 @@ h1::after {
     gap: 0.35rem;
 }
 
+.mode-control[hidden] {
+    display: none !important;
+}
+
+.field-hint {
+    margin: 0;
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+}
+
 .mode-control label {
     flex: none;
 }

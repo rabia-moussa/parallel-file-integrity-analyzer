@@ -60,6 +60,7 @@ WATCH_STATE = {
     "directory": None,
     "mode": None,
     "timestamp": None,
+    "workers": WORKERS,
     "started_at": None,
     "stop_requested": False,
     "last_run_id": None,
@@ -70,31 +71,49 @@ WATCH_STATE = {
 }
 
 
-def build_engine(mode, directory):
+def build_engine(mode, directory, workers=WORKERS):
     if mode == "sequential":
         return Sequential(BASELINE, directory)
     if mode == "multiprocess":
         # pas de handler SIGINT : Ctrl+C doit garder son role (arreter Flask)
-        return MultiProcess(BASELINE, WORKERS, directory, install_handler=False)
+        return MultiProcess(BASELINE, workers, directory, install_handler=False)
     if mode == "multithreaded":
-        return MultiTreaded(BASELINE, WORKERS, directory, install_handler=False)
+        return MultiTreaded(BASELINE, workers, directory, install_handler=False)
     raise ValueError(f"Unknown scan mode: {mode}")
+
+
+def parse_workers(payload):
+    """Nombre de workers pour multiprocess / multithreaded (defaut WORKERS)."""
+    value = payload.get("workers", WORKERS)
+    if isinstance(value, bool):
+        return None, ({"error": "workers must be an integer >= 1."}, 400)
+    try:
+        workers = int(value)
+    except (TypeError, ValueError):
+        return None, ({"error": "workers must be an integer >= 1."}, 400)
+    if workers < 1 or workers > 64:
+        return None, ({"error": "workers must be between 1 and 64."}, 400)
+    return workers, None
 
 
 def parse_payload():
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
-        return None, None, ({"error": "Request body must be a JSON object."}, 400)
+        return None, None, None, ({"error": "Request body must be a JSON object."}, 400)
 
     directory = payload.get("directory")
     mode = payload.get("scanMode", "sequential")
     if not isinstance(directory, str) or not directory.strip():
-        return None, None, ({"error": "A directory path is required."}, 400)
+        return None, None, None, ({"error": "A directory path is required."}, 400)
 
     directory = directory.strip()
     if not os.path.isdir(directory):
-        return None, None, ({"error": f"Not a directory: {directory}"}, 400)
-    return directory, mode, None
+        return None, None, None, ({"error": f"Not a directory: {directory}"}, 400)
+
+    workers, error = parse_workers(payload)
+    if error:
+        return None, None, None, error
+    return directory, mode, workers, None
 
 
 @app.after_request
@@ -143,7 +162,7 @@ def run_label(kind):
     return "BASELINE"
 
 
-def begin_run(kind, directory, mode):
+def begin_run(kind, directory, mode, workers=None):
     """Ouvre un bloc numéroté et bien délimité dans jornal.txt."""
     with COUNTER_LOCK:
         RUN_COUNTER[0] += 1
@@ -152,10 +171,11 @@ def begin_run(kind, directory, mode):
     run_id = new_run_id()
     run_log = get_task_logger("api", run_id)
     label = run_label(kind)
+    workers_field = "" if workers is None else f" workers={workers}"
     run_log.info("%s", SEPARATOR)
     run_log.info(
-        "%s #%d START run=%s directory=%s mode=%s",
-        label, seq, run_id, directory, mode,
+        "%s #%d START run=%s directory=%s mode=%s%s",
+        label, seq, run_id, directory, mode, workers_field,
     )
     run_log.info("%s", SEPARATOR)
     return seq, run_id, run_log
@@ -165,10 +185,11 @@ def finish_run(run_log, run_id, kind, seq, rc, duration, **fields):
     """Ferme le bloc, y compris quand le scan lève une exception."""
     details = " ".join(f"{key}={value}" for key, value in fields.items())
     label = run_label(kind)
+    suffix = (" " + details) if details else ""
     run_log.info("%s", SEPARATOR)
     run_log.info(
-        "%s #%d END run=%s rc=%d duration=%.3fs %s",
-        label, seq, run_id, rc, duration, details,
+        "%s #%d END run=%s rc=%d duration=%.3fs%s",
+        label, seq, run_id, rc, duration, suffix,
     )
     run_log.info("%s", SEPARATOR)
 
@@ -277,7 +298,7 @@ def watch_loop(engine, timestamp, run_log, run_id, seq, started):
 
 @app.route("/scan", methods=["POST"])
 def scan():
-    directory, mode, error = parse_payload()
+    directory, mode, workers, error = parse_payload()
     if error:
         return error
 
@@ -289,12 +310,12 @@ def scan():
         log.warning("scan rejected root=%s reason=busy", directory)
         return {"error": "A scan is already running."}, 409
 
-    seq, run_id, run_log = begin_run("check", directory, mode)
+    seq, run_id, run_log = begin_run("check", directory, mode, workers)
     started = time.perf_counter()
     rc = 2
     try:
         try:
-            engine = build_engine(mode, directory)
+            engine = build_engine(mode, directory, workers)
             # toutes les lignes du moteur portent le meme identifiant de bloc
             engine.run_id = run_id
         except ValueError as exc:
@@ -355,7 +376,7 @@ def scan():
 
 @app.route("/baseline", methods=["POST"])
 def baseline():
-    directory, mode, error = parse_payload()
+    directory, mode, workers, error = parse_payload()
     if error:
         return error
 
@@ -367,12 +388,12 @@ def baseline():
         log.warning("baseline rejected root=%s reason=busy", directory)
         return {"error": "A scan is already running."}, 409
 
-    seq, run_id, run_log = begin_run("baseline", directory, mode)
+    seq, run_id, run_log = begin_run("baseline", directory, mode, workers)
     started = time.perf_counter()
     rc = 2
     try:
         try:
-            engine = build_engine(mode, directory)
+            engine = build_engine(mode, directory, workers)
             engine.run_id = run_id
         except ValueError as exc:
             run_log.error("invalid mode mode=%s err=%s", mode, exc)
@@ -417,7 +438,7 @@ def verification_start():
     if not isinstance(payload, dict):
         return {"error": "Request body must be a JSON object."}, 400
 
-    directory, mode, error = parse_payload()
+    directory, mode, workers, error = parse_payload()
     if error:
         return error
     timestamp, error = parse_timestamp(payload)
@@ -433,13 +454,13 @@ def verification_start():
     SCAN_LOCK.release()
 
     try:
-        engine = build_engine(mode, directory)
+        engine = build_engine(mode, directory, workers)
     except ValueError as exc:
         with WATCH_LOCK:
             WATCH_STATE["running"] = False
         return {"error": str(exc)}, 400
 
-    seq, run_id, run_log = begin_run("watch", directory, mode)
+    seq, run_id, run_log = begin_run("watch", directory, mode, workers)
     engine.run_id = run_id
     started = time.perf_counter()
     with WATCH_LOCK:
@@ -449,6 +470,7 @@ def verification_start():
             "directory": directory,
             "mode": mode,
             "timestamp": timestamp,
+            "workers": workers,
             "started_at": now_iso(),
             "stop_requested": False,
             "ended_at": None,
@@ -476,6 +498,7 @@ def verification_start():
         "directory": directory,
         "mode": mode,
         "timestamp": timestamp,
+        "workers": workers,
     }, 202
 
 
