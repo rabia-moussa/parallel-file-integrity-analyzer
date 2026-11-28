@@ -124,7 +124,13 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     # page et assets toujours frais pendant le developpement
-    if request.path in ("/", "/verification_temp", "/app.css", "/api.js"):
+    if request.path in (
+        "/",
+        "/verification_temp",
+        "/app.css",
+        "/api.js",
+        "/verification_temp.js",
+    ):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -147,6 +153,11 @@ def app_css():
 @app.route("/api.js")
 def api_js():
     return send_from_directory(TEMPLATES_DIR, "api.js")
+
+
+@app.route("/verification_temp.js")
+def verification_temp_js():
+    return send_from_directory(TEMPLATES_DIR, "verification_temp.js")
 
 
 SEPARATOR = "=" * 78

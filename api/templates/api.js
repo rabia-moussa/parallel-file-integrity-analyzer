@@ -272,3 +272,27 @@ document.getElementById('mode').addEventListener('change', updateWorkersVisibili
 const uiState = document.getElementById('ui-state');
 if (uiState) uiState.textContent = 'JavaScript actif — résultats prêts';
 renderResults({});
+
+// Hamburger sidebar (present on both pages).
+function setupSidebar() {
+    const toggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!toggle || !sidebar || !backdrop) return;
+
+    function setOpen(open) {
+        sidebar.classList.toggle('open', open);
+        backdrop.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    }
+    toggle.addEventListener('click', () => setOpen(!sidebar.classList.contains('open')));
+    backdrop.addEventListener('click', () => setOpen(false));
+
+    const current = window.location.pathname;
+    document.querySelectorAll('.nav-link').forEach((link) => {
+        const target = new URL(link.href, window.location.origin).pathname;
+        if (target === current) link.classList.add('active');
+    });
+}
+setupSidebar();
