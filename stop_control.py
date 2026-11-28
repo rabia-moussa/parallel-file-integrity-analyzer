@@ -8,12 +8,14 @@ class StopController:
     first ctrl + c -> stop : producer stop and the workers drains the queue
     second ctrl +c -> abort : workers stopped when they want to start processing the next file 
     """
-    def __init__(self , ctx=None):
+    def __init__(self , ctx=None, install_handler=True):
      self.mode = ctx
      self.event = multiprocessing.Event() if ctx == 'process' else thread.Event()
      self.abort = multiprocessing.Event() if ctx == 'process' else thread.Event()
      self.clicks=0
-     self.install_signal_handler()
+     # le moteur sequentiel garde Ctrl+C (KeyboardInterrupt) : pas de handler
+     if install_handler:
+      self.install_signal_handler()
 
 
 

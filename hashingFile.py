@@ -1,33 +1,41 @@
 import hashlib as hs
+import logging
+
+from journal import get_task_logger
+
+log = logging.getLogger("fic.hashing")
 
 
+def hashing(file, stop=None, run=None):
+    """Empreinte SHA-256 d'un fichier, lue par blocs.
 
-
-def hashing(file,stop=None):
-    try :
-        hashobj=hs.sha256()
-        with open(file,'rb') as f:
-                while True :
-                    if stop is not None :
-                         return 'error:aborted'
-                    data=f.read(65000)
-                    if not data : break
-                    hashobj.update(data)
-        hash=hashobj.hexdigest()
-        if hash == None : raise Exception("Hashing failed")            
+    `stop` est un predicat sans argument (par exemple self.stop.stop_requested).
+    Il est consulte entre deux blocs ; s'il renvoie True, la fonction retourne
+    "Error:Aborted" sans avoir produit d'empreinte.
+    `run` est l'identifiant du bloc de log courant, pour que les avertissements
+    restent dans le meme run que le scan qui les a provoques.
+    """
+    log = get_task_logger("hashing", run) if run else log
+    try:
+        hashobj = hs.sha256()
+        with open(file, 'rb') as f:
+            while True:
+                if stop is not None and stop():
+                    return "Error:Aborted"
+                data = f.read(65536)
+                if not data:
+                    break
+                hashobj.update(data)
+        return hashobj.hexdigest()
     except FileNotFoundError as err:
-        print(f"Error occurred while hashing (file is not found){file}")
-        return f"Error:{type(err).__name__}"    
+        log.warning("file not found path=%s", file)
+        return f"Error:{type(err).__name__}"
     except PermissionError as err:
-         print(f"Permission denied while hashing {file}")
-         return f"Error:{type(err).__name__}"
+        log.warning("permission denied path=%s", file)
+        return f"Error:{type(err).__name__}"
     except OSError as err:
-         print(f"OS error occurred while hashing {file} : {err} ")    
-         return f"Error:{type(err).__name__}"
-    except Exception as e:
-             print(f"Error occurred while hashing {file} : {e}")
-             return f"Error:{type(e).__name__}"
-    else :
-        # print(f"Hashing completed for {file}")
-        return hash
-        
+        log.warning("os error path=%s err=%s", file, err)
+        return f"Error:{type(err).__name__}"
+    except Exception as err:
+        log.exception("hashing failed path=%s", file)
+        return f"Error:{type(err).__name__}"
