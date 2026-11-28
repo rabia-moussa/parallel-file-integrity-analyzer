@@ -220,19 +220,31 @@ class Sequential:
         return result
 
     def verification_tmp(self, timestamp):
+        """Boucle de verification periodique, arretable par /stop.
+
+        Un cycle = check + ecriture conditionnelle du baseline (I1), puis
+        attente de `timestamp` secondes. Le drapeau `abort` est verifie a chaque
+        frontiere pour que le 2e Ctrl+C / le bouton Stop interrompe la boucle.
+        """
         log = get_task_logger("watch", self.run_id)
-        try:
-            self.First_run()
-            i = 0
-            while True:
-                i += 1
-                self.run()
-                self.save_baseline()
-                log.info("cycle end i=%d", i)
-                time.sleep(timestamp)
-        except KeyboardInterrupt:
-            self.interrupted = True
-            log.warning("stopped by user")
+        if self.stop.abort_requested():
+            log.warning("abort already requested -> watcher exits")
+            return
+        if not self.First_run():
+            log.warning("initial baseline not written -> watcher exits")
+            return
+
+        i = 0
+        while not self.stop.abort_requested():
+            i += 1
+            result = self.run()
+            if result is None or self.stop.abort_requested():
+                break
+            self.save_baseline()
+            log.info("cycle end i=%d", i)
+            if self.stop.wait_abort_requested(timestamp):
+                break
+        log.info("watch end cycles=%d rc=%d", i, 1 if self.stop.abort_requested() else 0)
 
 
 if __name__ == "__main__":
