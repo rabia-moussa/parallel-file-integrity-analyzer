@@ -88,14 +88,21 @@ of `timestamp` seconds.
 | `stop_control.py` | `abort` / `event` events and two-stage SIGINT handler. |
 | `journal.py` | Only place that configures logging handlers. |
 | `api/server.py` | Flask API, locks, watcher, block logging. |
-| `api/templates/home.html` | Standalone normal check page (embedded CSS + JS). |
-| `api/templates/verification_temp.html` | Standalone watcher page (embedded CSS + JS). |
-| `api/templates/api.js`, `app.css` | Legacy assets still served, but **not referenced** by the pages. |
+| `api/templates/home.html` | Normal check page (markup only). |
+| `api/templates/verification_temp.html` | Periodic watcher page (markup only). |
+| `api/templates/app.css` | Shared stylesheet used by both pages. |
+| `api/templates/api.js` | JavaScript for the normal check page. |
+| `api/templates/verification_temp.js` | JavaScript for the periodic watcher page. |
 
-Both HTML pages embed their own CSS and JavaScript. To change the interface,
-edit `home.html` and `verification_temp.html`: editing `api.js` or `app.css`
-alone has no effect on the display. `TEMPLATES_AUTO_RELOAD = True` is enabled
-in Flask so template changes are reloaded even with `debug=False`.
+The two HTML pages contain only markup. Styling lives in `app.css`, and the
+page logic lives in `api.js` and `verification_temp.js`; Flask serves all three
+assets with `Cache-Control: no-store`. Asset links are relative (`app.css`,
+`api.js`, `verification_temp.js`), so the same HTML also works when opened from
+`api/templates/` via Live Server or `file://`; under Flask they resolve to the
+asset routes above. To change the layout, edit the HTML; to change styling,
+edit `app.css`; to change behaviour, edit the matching JS file.
+`TEMPLATES_AUTO_RELOAD = True` is enabled in Flask so template changes are
+reloaded even with `debug=False`.
 
 ---
 
@@ -106,8 +113,6 @@ in Flask so template changes are reloaded even with `debug=False`.
   standard library.
 - No `requirements.txt`, `pyproject.toml`, or `setup.py` is provided.
 
-> [TO VERIFY] Behavior of `multiprocess` mode outside Linux: the code relies on
-> `multiprocessing` with `forkserver` by default.
 
 ---
 
@@ -228,7 +233,7 @@ with `Cache-Control: no-store`.
 |---|---|---|
 | GET | `/` | Normal check page. |
 | GET | `/verification_temp` | Periodic watcher page. |
-| GET | `/app.css`, `/api.js` | Legacy assets (not used by the pages). |
+| GET | `/app.css`, `/api.js`, `/verification_temp.js` | CSS and JS assets served by Flask. |
 | POST | `/scan` | One-off scan. |
 | POST | `/baseline` | Write the baseline for a root. |
 | POST | `/verification_temp/start` | Start the watcher. |
@@ -446,10 +451,11 @@ osProject/
 ├── api/
 │   ├── server.py                  # Flask API
 │   └── templates/
-│       ├── home.html              # normal check (standalone)
-│       ├── verification_temp.html # periodic watcher (standalone)
-│       ├── api.js                 # legacy asset
-│       └── app.css                # legacy asset
+│       ├── home.html              # normal check (markup only)
+│       ├── verification_temp.html # periodic watcher (markup only)
+│       ├── api.js                 # normal check JavaScript
+│       ├── verification_temp.js   # periodic watcher JavaScript
+│       └── app.css                # shared stylesheet
 ├── dicTest.py                     # sandbox
 ├── hash_database.json             # actual baseline
 ├── hashingFile.py                 # interruptible SHA-256
@@ -465,5 +471,25 @@ osProject/
 ├── test.py, test2.py              # sandboxes / demos
 └── README.md
 ```
-f
 
+No `benchmarks/` folder is provided: no performance figures are published in
+this README.
+
+---
+
+## 15. Limits and points to verify
+
+- [TO VERIFY] The sidebar setup is duplicated in `api.js` and
+  `verification_temp.js`; it could be moved to a third shared file.
+- [TO VERIFY] Baseline writing is not atomic.
+- [TO VERIFY] `hash_database.json` is versioned and contains local absolute
+  paths; for a clean deployment, delete it and regenerate it via
+  **Create Baseline**.
+- [TO VERIFY] `First_run(force=False)` and `check_run(baseline=False)` accept
+  an unused parameter.
+- [TO VERIFY] `WATCH_STATE.run_id` keeps the last watcher's ID after it stops;
+  the interface shows `run_id` before `last_run_id`.
+- [TO VERIFY] CLI demos use hardcoded paths and `logs/fic.log`.
+- [TO VERIFY] `test2.py` requires `rich` (not declared); `dicTest.py` is not
+  executable as-is.
+- [TO VERIFY] No versioned automated tests are provided in the repository.
