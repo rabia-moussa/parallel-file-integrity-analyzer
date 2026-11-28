@@ -56,6 +56,14 @@ body {
     margin-bottom: 1.5rem;
 }
 
+.ui-state {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--new);
+}
+
 h1 {
     margin: 0 0 0.6rem;
     font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.15rem);
@@ -237,6 +245,16 @@ button:disabled {
    Results grid (fixes the old "display: flexbox" typo)
    ------------------------------------------------------------------------- */
 
+.result-error {
+    margin: 1rem 0 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--deleted);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: var(--deleted);
+    background-color: rgba(214, 90, 90, 0.08);
+}
+
 .results {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
@@ -292,8 +310,8 @@ button:disabled {
     color: var(--ink-muted);
 }
 
-/* Dynamic count line (the h2 with an id), rendered as a badge */
-.results h2[id] {
+/* Dynamic count line next to the static title, rendered as a badge */
+.results .result-count {
     display: inline-block;
     align-self: flex-start;
     max-width: 100%;
@@ -378,7 +396,16 @@ body:has(#form:valid) .results ul[id$="-list"]:empty::after {
    Duplicate groups (api.js appends a <ul> group per hash)
    ------------------------------------------------------------------------- */
 
-#duplicate-files-list > ul {
+#duplicate-files-list > li > strong {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    overflow-wrap: anywhere;
+}
+
+#duplicate-files-list > li > ul {
     margin: 0.4rem 0;
     padding: 0.55rem 0.65rem;
     list-style: none;
@@ -393,14 +420,14 @@ body:has(#form:valid) .results ul[id$="-list"]:empty::after {
     overflow-wrap: anywhere;
 }
 
-#duplicate-files-list > ul > li {
+#duplicate-files-list > li > ul > li {
     position: relative;
     padding: 0.15rem 0 0.15rem 1.1rem;
     color: var(--ink-muted);
     overflow-wrap: anywhere;
 }
 
-#duplicate-files-list > ul > li::before {
+#duplicate-files-list > li > ul > li::before {
     content: "\2514";
     position: absolute;
     left: 0.1rem;

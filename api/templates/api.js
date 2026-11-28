@@ -1,42 +1,53 @@
-async function runCheck(path, mode = 'sequential') {
-    try {
-        const response = await fetch('http://127.0.0.1:5000/scan' 
-            
-            , {method:'POST' , headers: { "Content-Type": "application/json" },body : JSON.stringify({directory: path , scanMode : mode}) } );
-        return response.json();
+// Quand la page est servie par Flask (port 5000), on reste en relatif.
+// Quand elle est servie par Live Server (5500), on appelle Flask en absolu.
+const API_BASE = window.location.port === "5000" ? "" : "http://127.0.0.1:5000";
 
-        }
-    catch (error) {
-        console.error('Error running check:', error);
-    }
-
-}
-
-async function Firstrun(path, mode = 'sequential') {
-    const response = await fetch('http://127.0.0.1:5000/baseline', {
-        method: 'POST',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directory: path, scanMode: mode })
-    });
-
+async function requestJSON(path, options) {
+    const response = await fetch(`${API_BASE}${path}`, options);
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`);
+        const error = new Error(data.error || `HTTP ${response.status}`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
     }
-
     return data;
 }
 
+async function runCheck(path, mode = 'sequential') {
+    return requestJSON('/scan', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directory: path, scanMode: mode }),
+    });
+}
+
+async function Firstrun(path, mode = 'sequential') {
+    return requestJSON('/baseline', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directory: path, scanMode: mode }),
+    });
+}
+
+
+function plural(count, singular, pluralForm) {
+    return count === 1 ? singular : pluralForm;
+}
 
 // Renders one flat result section (an array of file paths).
-// titleId / listId are the ids of the <h2> and <ul> already present in home.html.
-function renderFileList(titleId, listId, label, items) {
-    const title = document.getElementById(titleId);
+// countId is the badge next to the static <h2>; listId is the <ul>.
+function renderFileList(countId, listId, items) {
+    const count = document.getElementById(countId);
     const list = document.getElementById(listId);
     items = Array.isArray(items) ? items : [];
 
-    title.textContent = `${label} (${items.length})`;
+    if (count) {
+        count.textContent = items.length === 0
+            ? "none"
+            : `${items.length} ${plural(items.length, "file", "files")}`;
+    }
     list.innerHTML = "";
 
     if (items.length === 0) {
@@ -57,14 +68,18 @@ function renderFileList(titleId, listId, label, items) {
 
 // Renders the duplicates section, which is a { hash: [paths] } dictionary
 // and therefore needs a nested group -> files structure.
-function renderDuplicates(titleId, listId, label, duplicates) {
-    const title = document.getElementById(titleId);
+function renderDuplicates(countId, listId, duplicates) {
+    const count = document.getElementById(countId);
     const list = document.getElementById(listId);
     const groups = duplicates && typeof duplicates === "object"
         ? Object.entries(duplicates)
         : [];
 
-    title.textContent = `${label} (${groups.length} groups)`;
+    if (count) {
+        count.textContent = groups.length === 0
+            ? "none"
+            : `${groups.length} ${plural(groups.length, "group", "groups")}`;
+    }
     list.innerHTML = "";
 
     if (groups.length === 0) {
@@ -79,13 +94,14 @@ function renderDuplicates(titleId, listId, label, duplicates) {
         const group = document.createElement("li");
 
         const header = document.createElement("strong");
-        header.textContent = `Hash: ${hash}`;
+        header.textContent = `Hash: ${hash.slice(0, 16)}…`;
+        header.title = hash;
         group.appendChild(header);
 
         const fileList = document.createElement("ul");
-        (Array.isArray(files) ? files : []).forEach((file, index) => {
+        (Array.isArray(files) ? files : []).forEach((file) => {
             const item = document.createElement("li");
-            item.textContent = `File ${index + 1}: ${file}`;
+            item.textContent = file;
             fileList.appendChild(item);
         });
 
@@ -100,43 +116,43 @@ function renderDuplicates(titleId, listId, label, duplicates) {
 // periodic scan (pass the promise / value produced by either one).
 async function renderResults(source) {
     const result = await source;
+    const data = result || {};
 
     renderFileList(
         "permission-denied-title",
         "permission-denied-list",
-        "Permission Denied Files",
-        result?.permission_denied
+        data.permission_denied
     );
     renderFileList(
         "modified-files-title",
         "modified-files-list",
-        "Modified Files",
-        result?.modified
+        data.modified
     );
     renderFileList(
         "new-files-title",
         "new-files-list",
-        "New Files",
-        result?.new
+        data.new
     );
     renderFileList(
         "deleted-files-title",
         "deleted-files-list",
-        "Deleted Files",
-        result?.deleted
+        data.deleted
     );
     renderDuplicates(
         "duplicate-files-title",
         "duplicate-files-list",
-        "Duplicate Files",
-        result?.duplicates
+        data.duplicates
     );
 }
 
 
 const form = document.querySelector('form');
 const firstRunButton = document.getElementById('first-run');
+const submitButton = form.querySelector('button[type="submit"]');
+const stopButton = document.getElementById('stop-scan');
 const statusMessage = document.getElementById('status-message');
+
+const resultError = document.getElementById('result-error');
 
 function setStatus(message, type = '') {
     if (!statusMessage) return;
@@ -144,14 +160,55 @@ function setStatus(message, type = '') {
     statusMessage.className = type;
 }
 
+function showResultError(message) {
+    if (!resultError) return;
+    resultError.textContent = message;
+    resultError.hidden = false;
+}
+
+function clearResultError() {
+    if (!resultError) return;
+    resultError.textContent = '';
+    resultError.hidden = true;
+}
+
 form.addEventListener('submit', async (event) => {
-    event.preventDefault()
-    const directoryInput = document.getElementById('directory');
-    const directoryPath = directoryInput.value
+    event.preventDefault();
+
+    const directoryPath = document.getElementById('directory').value.trim();
     const mode = document.getElementById('mode').value;
-    setStatus('');
-    await renderResults(runCheck(directoryPath, mode))
-})
+
+    if (!directoryPath) {
+        setStatus('Please enter a directory path first.', 'error');
+        return;
+    }
+
+    submitButton.disabled = true;
+    setStatus('Scanning... this can take several minutes.');
+
+    try {
+        clearResultError();
+        const result = await runCheck(directoryPath, mode);
+        await renderResults(result);
+
+        if (result.complete === false) {
+            const pending = Array.isArray(result.unprocessed) ? result.unprocessed.length : 0;
+            setStatus(`Scan incomplete: ${pending} file(s) not processed.`, 'error');
+            showResultError(`Scan incomplete: ${pending} file(s) not processed.`);
+        } else {
+            setStatus(`Scan complete (${result.mode}).`, 'success');
+        }
+    } catch (error) {
+        // Meme en cas d'erreur, on remplit les sections avec ce que le serveur
+        // a renvoye (ou avec des listes vides) pour ne jamais laisser la zone
+        // de resultats completement blanche.
+        await renderResults(error.data || {});
+        setStatus(error.message, 'error');
+        showResultError(error.message);
+    } finally {
+        submitButton.disabled = false;
+    }
+});
 
 firstRunButton.addEventListener('click', async () => {
     const directoryPath = document.getElementById('directory').value.trim();
@@ -166,14 +223,33 @@ firstRunButton.addEventListener('click', async () => {
     setStatus('Creating the baseline...');
 
     try {
+        clearResultError();
         const result = await Firstrun(directoryPath, mode);
         setStatus(
-            `Baseline created for ${result.directory || directoryPath} (${result.mode || mode}).`,
+            `Baseline created for ${result.directory || directoryPath} (${result.mode || mode}, ${result.entries} entries).`,
             'success'
         );
     } catch (error) {
         setStatus(error.message, 'error');
+        showResultError(error.message);
     } finally {
         firstRunButton.disabled = false;
     }
 });
+
+if (stopButton) {
+    stopButton.addEventListener('click', async () => {
+        try {
+            const data = await requestJSON('/stop', { method: 'POST' });
+            setStatus(data.status === 'stopping' ? 'Stopping the current scan...' : 'No scan is running.');
+        } catch (error) {
+            setStatus(error.message, 'error');
+            showResultError(error.message);
+        }
+    });
+}
+
+// Etat initial : les cinq sections affichent "None" des le chargement.
+const uiState = document.getElementById('ui-state');
+if (uiState) uiState.textContent = 'JavaScript actif — résultats prêts';
+renderResults({});
