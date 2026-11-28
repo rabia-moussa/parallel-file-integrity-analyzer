@@ -1,178 +1,242 @@
 from collections import Counter
-import os 
-from hashingFile import hashing
-import hashlib as hs
-import signal
 import json
-
+import logging
+import os
 import time
+
+from hashingFile import hashing
+from journal import get_task_logger, new_run_id, setup_logging
+from stop_control import StopController
+
 
 class Sequential:
     def __init__(self, hash_db, path):
         self.hash_db = hash_db
+        # cle canonique : /data, /data/ et un lien symbolique designent la meme racine
         self.path = os.path.realpath(os.path.abspath(path))
         self.hash_directory = {}
-       
+        # etat de completude du dernier scan (voir scan_complete)
+        self.unprocessed = []
+        self.interrupted = False
+        self.walk_failed = False
+        self.run_id = new_run_id()
+        # evenements seulement : Ctrl+C continue de lever KeyboardInterrupt
+        self.stop = StopController(None, install_handler=False)
 
-    
-
-    
     def check_duplicate(self):
-        valid_files={}
-        for path , hash in self.hash_directory.items():
-           
-            if hash == None : continue
-            try :
-                if  os.path.getsize(path) == 0 :
+        log = get_task_logger("duplicates", self.run_id)
+        valid_files = {}
+        for path, hash in self.hash_directory.items():
+            if hash is None:
+                continue
+            try:
+                if os.path.getsize(path) == 0:
                     continue
             except OSError as err:
-                print(f"OS error occurred while checking duplicates for {path} : {err} ")
+                log.warning("getsize failed path=%s err=%s", path, err)
                 continue
             if hash.startswith("Error:"):
-                continue    
-            valid_files[path]=hash
+                continue
+            valid_files[path] = hash
         hash_counts = Counter(valid_files.values())
-        # print(hash_counts.elements())
-        # print(list(hash_counts.elements()))
-        duplicated_files = [(path,hash) for path , hash in valid_files.items() if hash_counts[hash] > 1] 
-        result ={}
+        duplicated_files = [
+            (path, hash)
+            for path, hash in valid_files.items()
+            if hash_counts[hash] > 1
+        ]
+        result = {}
         for path, hash in duplicated_files:
-            # print(f"the path is {path} and the hash is {hash}")
-            result.setdefault(hash,[]).append(path)
-        return result    # return a dictionary with the hash as key and the list of paths as value
-                
-    # I must resturn a tuple contain all duplicated files in the same group 
-            # if list(hash_directory.values()).count(hash) > 1 :
-            #     if path not in ls_duplicate: ls_duplicate.append(path)
-            
-                
-                
-    def check_modified(self):
-        ls_modified=[]
-        ls_new=[]
-        ls_deleted=[]
-        with open(self.hash_db ,'r') as f:
-            hash_database=json.load(f)
-        enteries=hash_database.get(self.path) 
-        if enteries is None :
-            raise KeyError(f"no baseline for this root : {self.path}")   
-            # print(f"the hash database is {hash_database}")
-            # print(f"the hash directory is {self.hash_directory}")
-        ls_modified=[path for path , hash in self.hash_directory.items()  if path in enteries and hash != enteries[path]]
-        ls_new=[path for path in self.hash_directory if path not in enteries]
-        ls_deleted=[path for path in enteries if path not in self.hash_directory and  not os.path.lexists(path)] # check if the file is deleted in the current run and in the disk
-        ls_permission_denied=[path for path , hash in self.hash_directory.items()  if hash.startswith("Error:PermissionError")]
-        return ls_modified, ls_new, ls_deleted, ls_permission_denied # those are lists of paths
+            result.setdefault(hash, []).append(path)
+        log.debug("groups=%d files=%d", len(result), len(duplicated_files))
+        return result
 
-   
+    def check_modified(self):
+        log = get_task_logger("check", self.run_id)
+        try:
+            with open(self.hash_db, 'r') as f:
+                hash_database = json.load(f)
+        except FileNotFoundError:
+            log.error("baseline file missing path=%s", self.hash_db)
+            raise KeyError(f"no baseline file : {self.hash_db}") from None
+        except json.JSONDecodeError as err:
+            log.error("baseline file invalid path=%s err=%s", self.hash_db, err)
+            raise KeyError(f"invalid baseline file : {self.hash_db}") from None
+
+        entries = hash_database.get(self.path)
+        if entries is None:
+            log.error("no baseline for root=%s", self.path)
+            raise KeyError(f"no baseline for this root : {self.path}")
+
+        ls_modified = [
+            path
+            for path, hash in self.hash_directory.items()
+            if path in entries and hash != entries[path]
+        ]
+        ls_new = [path for path in self.hash_directory if path not in entries]
+        ls_deleted = [
+            path
+            for path in entries
+            if path not in self.hash_directory and not os.path.lexists(path)
+        ]
+        ls_permission_denied = [
+            path
+            for path, hash in self.hash_directory.items()
+            if hash.startswith("Error:PermissionError")
+        ]
+        log.debug(
+            "modified=%d new=%d deleted=%d denied=%d",
+            len(ls_modified), len(ls_new), len(ls_deleted), len(ls_permission_denied),
+        )
+        return ls_modified, ls_new, ls_deleted, ls_permission_denied
 
     def parcour(self):
-        # print("now using the walk command")
-        self.hash_directory={}
-        for root, dirs, files in os.walk(self.path): 
+        log = get_task_logger("scan", self.run_id)
+        if not os.path.isdir(self.path):
+            log.error("not a directory path=%s", self.path)
+            raise ValueError(f"not a directory: {self.path}")
 
+        self.hash_directory = {}
+        self.walk_failed = False
+        self.interrupted = False
+
+        def onerror(err):
+            # os.walk ignore silencieusement les dossiers illisibles : on le trace
+            # et on marque le scan incomplet pour ne pas ecrire un baseline partiel.
+            self.walk_failed = True
+            log.warning("walk error path=%s err=%s",
+                        getattr(err, "filename", "?"), err)
+
+        start = time.perf_counter()
+        for root, dirs, files in os.walk(self.path, onerror=onerror):
+            if self.stop.abort_requested():
+                self.interrupted = True
+                break
             for name in files:
-                # print(name , "the permissions are: ", oct(os.stat(os.path.join(root, name)).st_mode)[-3:])
-                # print(f"the path is {os.path.join(root,name)} and the hash is {hashing(os.path.join(root,name))} \n")
-                self.hash_directory[os.path.join(root,name)]=hashing(os.path.join(root,name))
-        return self.hash_directory  
-          
+                if self.stop.abort_requested():
+                    self.interrupted = True
+                    break
+                full = os.path.join(root, name)
+                digest = hashing(full, self.stop.abort_requested, self.run_id)
+                if digest == "Error:Aborted":
+                    self.interrupted = True
+                    break
+                self.hash_directory[full] = digest
+            if self.interrupted:
+                break
+        log.info(
+            "walk done files=%d walk_failed=%s duration=%.3fs",
+            len(self.hash_directory), self.walk_failed,
+            time.perf_counter() - start,
+        )
+        return self.hash_directory
 
+    def scan_complete(self):
+        """True si le dernier scan a couvert toute la racine sans abandon."""
+        return not self.unprocessed and not self.interrupted and not self.walk_failed
 
-    def First_run(self):
-        """creates a checks basline """
-        data={}
+    def save_baseline(self):
+        """Ecrit le baseline uniquement si le scan est complet (invariant I1)."""
+        log = get_task_logger("baseline", self.run_id)
+        if not self.scan_complete():
+            log.warning(
+                "skipped reason=incomplete unprocessed=%d interrupted=%s walk_failed=%s",
+                len(self.unprocessed), self.interrupted, self.walk_failed,
+            )
+            return False
+
+        data = {}
         if os.path.lexists(self.hash_db):
             try:
                 with open(self.hash_db) as f:
-                    data=json.load(f)
-                if not isinstance(data,dict):
-                    raise ValueError("isn t a json format")
-            except (json.JSONDecodeError, OSError,ValueError):
-                print("baseline unreadable -> rebuilding it")
-                data={}
-        #merge the hash directory into data
-        data[self.path]=self.parcour()
-        with open(self.hash_db, 'w') as f:
-            json.dump(data, f,indent=2)
+                    data = json.load(f)
+                if not isinstance(data, dict):
+                    raise ValueError("baseline must be a JSON object")
+            except (json.JSONDecodeError, OSError, ValueError):
+                log.warning("unreadable -> rebuilding path=%s", self.hash_db)
+                data = {}
 
+        # ancien format plat : chemin -> hash (aucune racine stockee)
+        if data and all(isinstance(v, str) for v in data.values()):
+            log.warning("legacy flat format -> rebuilding path=%s", self.hash_db)
+            data = {}
+
+        data[self.path] = self.hash_directory
+        with open(self.hash_db, 'w') as f:
+            json.dump(data, f, indent=2)
+        log.info("written root=%s entries=%d roots=%d",
+                 self.path, len(self.hash_directory), len(data))
+        return True
+
+    def First_run(self, force=False):
+        """Cree ou remplace l'entree de cette racine dans le baseline.
+
+        `force` est conserve pour compatibilite avec l'API : l'entree de la
+        racine est de toute facon remplacee, les autres racines sont preservees.
+        """
+        log = get_task_logger("baseline", self.run_id)
+        log.info("start root=%s", self.path)
+        self.hash_directory = self.parcour()
+        ok = self.save_baseline()
+        log.info("end root=%s rc=%d", self.path, 0 if ok else 1)
+        return ok
 
     def check_run(self, baseline: bool = False):
-        try :
-            # self.First_run(baseline)
-            start_timer=time.perf_counter()
-            self.hash_directory=self.parcour()
-            end_timer=time.perf_counter()
-            print('the require time for one run is',end_timer-start_timer)
+        log = get_task_logger("check", self.run_id)
+        self.interrupted = False
+        self.walk_failed = False
+        self.unprocessed = []
+        try:
+            start = time.perf_counter()
+            self.hash_directory = self.parcour()
+            if self.interrupted:
+                log.warning("scan aborted before comparison")
+                return None
             modified, new, deleted, permission_denied = self.check_modified()
             duplicates = self.check_duplicate()
+            log.info(
+                "done files=%d modified=%d new=%d deleted=%d denied=%d "
+                "duplicates=%d duration=%.3fs",
+                len(self.hash_directory), len(modified), len(new), len(deleted),
+                len(permission_denied), len(duplicates),
+                time.perf_counter() - start,
+            )
             return modified, new, deleted, duplicates, permission_denied
-        except KeyboardInterrupt :
-            print("\n stopped by the user")
+        except KeyboardInterrupt:
+            self.interrupted = True
+            log.warning("interrupted by user")
             return None
 
     def run(self):
-        # print('the check run is now starting')
-        
         result = self.check_run(False)
-        
-        if result is None :
+        if result is None:
             print('the check in interrupted')
             return None
-        modified, new, deleted ,duplicates, permission_denied = result
+        modified, new, deleted, duplicates, permission_denied = result
         print('the modified files are: ', modified)
         print('the new files are: ', new)
         print('the deleted files are: ', deleted)
         print('the duplicate files are: ', duplicates)
         print('the permission denied files are: ', permission_denied)
-     
-    def verification_tmp(self,timestamp):
-        try :    
-            self.First_run() # create a baseline
-            i=0
+        return result
+
+    def verification_tmp(self, timestamp):
+        log = get_task_logger("watch", self.run_id)
+        try:
+            self.First_run()
+            i = 0
             while True:
-                i+=1
-                self.run() # return the modified, new, deleted and duplicates files
-                with open(self.hash_db,'w') as f:
-                    json.dump(self.hash_directory, f) # print the hash directory in the json file (put the new version as the recent one)
-                print("the timestamp end",i)
+                i += 1
+                self.run()
+                self.save_baseline()
+                log.info("cycle end i=%d", i)
                 time.sleep(timestamp)
         except KeyboardInterrupt:
-            print('\n stopped by the user')        
-            
-    
-if __name__ =="__main__":
+            self.interrupted = True
+            log.warning("stopped by user")
+
+
+if __name__ == "__main__":
     seq = Sequential('hash_database.json', '/home/moussa/Documents')
+    setup_logging("cli", seq.run_id, level="INFO", path="logs/fic.log")
     seq.First_run()
-    seq.run()   
-
-
-
-    # print('the first run is now starting')
-    # seq = Sequential('hash_database.json', '/home/moussa/Documents/otherFiles')
-    # seq.First_run()
-    
-    # time.sleep(30)
-    # print("the timestamp end")
-
-    # print('the check run is now starting')
-    # modified, new, deleted ,duplicates = seq.check_run()
-
-    # print('the modified files are: ', modified)
-    # print('the new files are: ', new)
-    # print('the deleted files are: ', deleted)
-    # print('the duplicate files are: ', duplicates)
-
-
-
- 
-# print(check_duplicate(parcour('/home/moussa/Documents')))
-
-                    
-
-
-# next steps 
-# 1- replace the brut path by a variable that can be passed as an argument to the script  
-# 2 - save the hashing result in a json format (dictionanry before) with the file path as key and the hash as value
-# 3- add a duplicate detection function that will check if the hash already exists 
-# 4- the results of errors/modified files + duplicates should be saved in a log file with the date and time of the run
+    seq.run()
