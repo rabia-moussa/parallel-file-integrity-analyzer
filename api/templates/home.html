@@ -528,9 +528,162 @@ body:has(#form:valid) .results ul[id$="-list"]:empty::after {
 }
 /* ==================== END DARK MODE ==================== */
 
+/* -------------------------------------------------------------------------
+   Hamburger sidebar — shared by the normal check and verification_temp pages
+   ------------------------------------------------------------------------- */
+.hamburger {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 60;
+    width: 2.6rem;
+    height: 2.6rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    background-color: var(--surface);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.hamburger span {
+    display: block;
+    width: 1.1rem;
+    height: 2px;
+    border-radius: 2px;
+    background-color: currentColor;
+}
+
+.sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 70;
+    width: min(280px, 82vw);
+    padding: 4.5rem 1.25rem 1.5rem;
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    transform: translateX(-105%);
+    transition: transform 0.18s ease;
+}
+
+.sidebar.open {
+    transform: translateX(0);
+}
+
+.sidebar-head {
+    margin: 0 0 1rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+.nav-link {
+    display: block;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+.nav-link:hover {
+    background-color: var(--surface-2);
+}
+
+.nav-link.active {
+    color: #ffffff;
+    background-color: var(--accent);
+}
+
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background-color: rgba(20, 14, 8, 0.35);
+}
+
+.sidebar-backdrop[hidden] {
+    display: none;
+}
+
+body {
+    padding-top: 4.5rem;
+}
+
+/* Verification temp state panel */
+.watch-state {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.watch-state h2 {
+    margin: 0 0 1rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+.watch-state dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.45rem 1rem;
+    margin: 0;
+}
+
+.watch-state dt {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+}
+
+.watch-state dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+}
+
+.watch-state dd.running {
+    color: var(--new);
+}
+
+.watch-state dd.stopped {
+    color: var(--deleted);
+}
+
+.notice code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+}
+
 </style>
 </head>
 <body>
+    <button id="sidebar-toggle" class="hamburger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+        <span></span><span></span><span></span>
+    </button>
+    <nav id="sidebar" class="sidebar" aria-label="Main navigation">
+        <p class="sidebar-head">Navigation</p>
+        <a class="nav-link" href="/">Normal check</a>
+        <a class="nav-link" href="/verification_temp">Verification temp</a>
+    </nav>
+    <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
     <header class="page-header">
         <h1>File Integrity Checker</h1>
         <p id="ui-state" class="ui-state">Interface en chargement…</p>
@@ -855,6 +1008,31 @@ if (stopButton) {
 const uiState = document.getElementById('ui-state');
 if (uiState) uiState.textContent = 'JavaScript actif — résultats prêts';
 renderResults({});
+
+
+// Hamburger sidebar (present on both pages).
+function setupSidebar() {
+    const toggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!toggle || !sidebar || !backdrop) return;
+
+    function setOpen(open) {
+        sidebar.classList.toggle('open', open);
+        backdrop.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    }
+    toggle.addEventListener('click', () => setOpen(!sidebar.classList.contains('open')));
+    backdrop.addEventListener('click', () => setOpen(false));
+
+    const current = window.location.pathname;
+    document.querySelectorAll('.nav-link').forEach((link) => {
+        const target = new URL(link.href, window.location.origin).pathname;
+        if (target === current) link.classList.add('active');
+    });
+}
+setupSidebar();
 
 </script>
 </body>
