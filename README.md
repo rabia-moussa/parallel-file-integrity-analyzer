@@ -465,7 +465,5 @@ osProject/
 ├── test.py, test2.py              # sandboxes / demos
 └── README.md
 ```
-
-No `benchmarks/` folder is provided: no performance figures are published in
-this README.
+f
 
